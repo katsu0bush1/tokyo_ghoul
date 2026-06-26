@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>スロット設定判別テンプレート</title>
+<!--
+========================================================================
+ スロット設定判別＆攻略ツール テンプレート v1.0
+ ------------------------------------------------------------------------
+ ★編集するのは <script id="machine"> 内の MACHINE オブジェクトのみ。
+   その下の ENGINE / STATE / RENDER / EVENTS は共通部分（原則不変）。
+ ★攻略情報は DMMぱちタウン・一撃・なな徹 の3ソースを必ず照合すること。
+========================================================================
+-->
+<style>
+:root{
+  --c-primary:#00E5C8; --c-accent:#FF3D7F; --c-bg:#04070d;
+  --c-text:#dbe6ee; --c-win:#5bffa0; --c-lose:#ff5a78;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none}
+body{background:var(--c-bg);color:var(--c-text);font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN',sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
+button{touch-action:manipulation;font-family:inherit;cursor:pointer;border:none;outline:none;color:inherit}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+input[type=number]{-moz-appearance:textfield}
+#W{max-width:520px;margin:0 auto;display:flex;flex-direction:column;height:100vh;height:100dvh;padding-top:env(safe-area-inset-top,0px)}
+
+/* Header */
+#hdr{background:rgba(6,11,18,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);padding:11px 14px 7px;border-bottom:1px solid rgba(0,229,200,.18);flex-shrink:0}
+.hr{display:flex;align-items:center;justify-content:space-between}
+.ht{font-size:15px;font-weight:900;background:linear-gradient(105deg,var(--c-primary),var(--c-accent));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.5px}
+.hs{font-size:9.5px;color:rgba(255,255,255,.32);margin-top:2px}
+.hbtns{display:flex;gap:6px;align-items:center}
+.hb{padding:5px 11px;border-radius:8px;font-size:11px;font-weight:700;background:rgba(255,61,127,.08);border:1px solid rgba(255,61,127,.22);color:#ff7da6}
+.hb.p{background:rgba(255,61,127,.16);border-color:rgba(255,61,127,.45);color:#ff5c93}
+.hb.rst{background:rgba(255,90,120,.1);border-color:rgba(255,90,120,.28);color:#ff8da3}
+.cfm{margin-top:6px;padding:5px 10px;border-radius:8px;font-size:11px;font-weight:700}
+
+/* Quick stats */
+.qs{display:flex;gap:5px;flex-wrap:wrap;padding:6px 14px;background:rgba(5,9,15,.95);border-bottom:1px solid rgba(255,255,255,.04);font-size:10px;flex-shrink:0}
+.qc{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:7px;padding:4px 8px;flex:1;min-width:0;text-align:center}
+.qc .l{color:rgba(255,255,255,.52);font-size:9px;display:block;margin-bottom:1px}
+.qc .v{color:var(--c-primary);font-weight:700;font-size:12px;font-family:'SF Mono',ui-monospace,monospace}
+.qc .v2{color:rgba(255,255,255,.45);font-size:9px}
+
+#bd{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 12px 90px}
+
+/* Tabs */
+#tb{display:flex;background:rgba(6,11,18,.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid rgba(0,229,200,.14);flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,0px)}
+.tab{flex:1;padding:9px 2px 8px;text-align:center;font-size:10px;font-weight:700;color:rgba(255,255,255,.34);position:relative}
+.tab.on{color:var(--c-primary)}
+.tab.on::before{content:"";position:absolute;top:0;left:22%;right:22%;height:2px;background:linear-gradient(90deg,var(--c-primary),var(--c-accent));border-radius:0 0 3px 3px}
+.tab .ic{font-size:17px;display:block;margin-bottom:2px;line-height:1}
+
+/* Cards */
+.card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);border-radius:13px;padding:12px;margin-bottom:10px}
+.card.glow{border-color:rgba(0,229,200,.22)}
+.ct{font-size:12px;font-weight:800;color:#7fe9dc;margin-bottom:9px;letter-spacing:.4px;display:flex;align-items:center;gap:6px}
+.ct .tag{font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;background:rgba(0,229,200,.1);color:#5fe6d6;border:1px solid rgba(0,229,200,.2)}
+.sub{font-size:10px;color:rgba(255,255,255,.52);margin:-4px 0 8px;line-height:1.55}
+
+/* Event grid */
+.eg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.egrp{margin-bottom:9px}.egrp:last-child{margin-bottom:0}
+.egrp-h{display:block;font-size:10px;font-weight:700;color:rgba(127,233,220,.7);margin-bottom:5px;letter-spacing:.5px}
+.eb{padding:12px 4px;border-radius:11px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.1);border-left:3px solid rgba(0,229,200,.55);font-size:11.5px;font-weight:700;color:rgba(255,255,255,.82);transition:transform .12s;text-align:center;line-height:1.3}
+.eb:active{transform:scale(.94)}
+.eb.on{background:linear-gradient(135deg,rgba(0,229,200,.28),rgba(91,200,255,.16));border-color:rgba(0,229,200,.65);color:#d6fff8}
+.eb .es{display:block;font-size:9px;color:rgba(255,255,255,.42);font-weight:600;margin-top:2px}
+.eb.on .es{color:rgba(214,255,248,.72)}
+
+/* Segmented */
+.seg{display:flex;gap:5px;flex-wrap:wrap}
+.so{flex:1;min-width:60px;padding:10px 4px;border-radius:9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);font-size:11px;font-weight:700;color:rgba(255,255,255,.72);text-align:center;transition:transform .12s}
+.so:active{transform:scale(.95)}
+.so.on{background:rgba(0,229,200,.22);border-color:rgba(0,229,200,.6);color:#d6fff8}
+.so.win.on{background:rgba(91,255,160,.2);border-color:rgba(91,255,160,.55);color:#c8ffd9}
+.so.lose.on{background:rgba(255,90,120,.18);border-color:rgba(255,90,120,.5);color:#ffc2ce}
+
+/* Fields */
+.fld{margin-top:10px}
+.fl{font-size:11px;color:rgba(255,255,255,.64);margin-bottom:5px;font-weight:600}
+.gi input,textarea{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:11px 13px;color:#eaf6f3;font-size:16px;font-weight:700;font-family:'SF Mono',ui-monospace,monospace;outline:none}
+textarea{font-size:13px;font-family:inherit;font-weight:400;resize:none}
+.gi input:focus,textarea:focus{border-color:rgba(0,229,200,.5)}
+
+.addb{width:100%;margin-top:12px;padding:14px;border-radius:12px;background:linear-gradient(135deg,#00B89E,#0090C8);color:#02110e;font-size:14px;font-weight:900;letter-spacing:1px}
+.addb:active{transform:scale(.98);opacity:.92}
+.addb:disabled{opacity:.3}
+
+/* Counter rows */
+.crow{display:flex;align-items:center;gap:8px;padding:9px 8px;border-bottom:1px solid rgba(255,255,255,.05)}
+.crow.active{background:rgba(0,229,200,.07);border-left:3px solid rgba(0,229,200,.5)}
+.crow:last-child{border-bottom:none}
+.cinfo{flex:1;min-width:0}.cnm{font-size:12.5px;font-weight:700;color:rgba(255,255,255,.82)}
+.cbadge{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;margin-top:2px;background:rgba(0,229,200,.14);color:#5fe6d6}
+.cw{display:flex;align-items:center;gap:5px}
+.cmin,.cplus{width:36px;height:36px;border-radius:9px;font-size:19px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.cmin{background:rgba(255,90,120,.09);border:1px solid rgba(255,90,120,.16);color:#ff8da3}
+.cplus{background:rgba(0,229,200,.08);border:1px solid rgba(0,229,200,.16);color:#7fe9dc}
+.cmin:active,.cplus:active{transform:scale(.86)}
+.cval{min-width:34px;height:36px;border-radius:9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;font-family:'SF Mono',ui-monospace,monospace;padding:0 5px}
+
+/* Tables / bars */
+.itbl{width:100%;border-collapse:collapse;margin:6px 0;font-size:11px}
+.itbl th{background:rgba(0,229,200,.08);color:#7fe9dc;padding:5px 6px;text-align:center;font-weight:700;border:1px solid rgba(255,255,255,.06)}
+.itbl td{padding:5px 6px;text-align:center;color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.05)}
+.itbl td.h{color:#FFD66B;font-weight:700}
+.itbl td.k{color:rgba(255,255,255,.78);font-weight:600;text-align:left}
+.sbar{display:flex;align-items:center;gap:7px;margin-top:5px}
+.sbar .sl{width:30px;font-size:10px;color:rgba(255,255,255,.45);font-weight:700}
+.sbar .st{flex:1;height:13px;background:rgba(255,255,255,.05);border-radius:7px;overflow:hidden}
+.sbar .sf{height:100%;border-radius:7px;background:linear-gradient(90deg,#0090C8,var(--c-primary))}
+.sbar .sv{width:48px;font-size:10px;color:rgba(255,255,255,.6);font-weight:700;text-align:right;font-family:'SF Mono',ui-monospace,monospace}
+.sbar.best .sf{background:linear-gradient(90deg,#FF8A00,#FFD66B)}
+.sbar.best .sv{color:#FFD66B}
+.calc-sub{color:rgba(255,255,255,.3);margin-top:3px;font-size:9.5px;line-height:1.5}
+
+.ib{margin-bottom:9px;padding:10px 12px;border-radius:11px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06)}
+.ib p{font-size:11.5px;color:rgba(255,255,255,.62);line-height:1.65;margin:3px 0}
+.ib .em{color:#FFD66B;font-weight:700}
+
+/* Timeline */
+.tl-empty{text-align:center;color:rgba(255,255,255,.25);padding:40px 0;font-size:12px}
+.tli{display:flex;gap:9px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.tli-i{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:rgba(255,255,255,.05)}
+.tli-b{flex:1;min-width:0}.tli-t{font-size:12px;font-weight:700;color:rgba(255,255,255,.82)}
+.tli-s{font-size:10px;color:rgba(255,255,255,.4);margin-top:2px;line-height:1.45}
+.tli-x{color:rgba(255,90,120,.5);font-size:18px;padding:0 4px;align-self:center}
+.tli-g{font-size:11px;color:#7fe9dc;font-weight:700;font-family:'SF Mono',ui-monospace,monospace;align-self:center}
+
+.exp-ta{width:100%;min-height:280px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:12px;color:#9fd8d0;font-size:11px;font-family:'SF Mono',ui-monospace,monospace;white-space:pre-wrap;resize:none;outline:none;-webkit-user-select:all;user-select:all}
+.btn2{display:flex;gap:8px;margin-top:10px}
+.btn2 button{flex:1;padding:12px;border-radius:11px;font-size:12px;font-weight:700}
+.bcopy{background:rgba(0,229,200,.12);border:1px solid rgba(0,229,200,.3);color:#7fe9dc}
+.note{font-size:9.5px;color:rgba(255,255,255,.28);text-align:center;margin-top:14px;line-height:1.6}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);z-index:999;display:flex;align-items:center;justify-content:center;padding:24px}
+.modal-card{background:#12121c;border:1px solid rgba(255,90,120,.3);border-radius:16px;padding:22px 20px;max-width:340px;width:100%}
+.modal-t{font-size:16px;font-weight:900;color:#ff8da3;margin-bottom:8px}
+.modal-m{font-size:12px;color:rgba(255,255,255,.7);line-height:1.6;margin-bottom:18px}
+.modal-btns{display:flex;gap:10px}
+.modal-cancel,.modal-ok{flex:1;padding:13px;border-radius:11px;font-size:13px;font-weight:800}
+.modal-cancel{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.85)}
+.modal-ok{background:linear-gradient(135deg,#ff5a78,#ff3d6e);color:#fff}
+</style>
+</head>
+<body>
+<div id="W">
+<div id="hdr">
+<div class="hr">
+<div><div class="ht" id="hTitle"></div><div class="hs" id="hSub"></div></div>
+<div class="hbtns">
+<button class="hb" id="setBtn">示唆 −</button>
+<button class="hb rst" data-a="reset">リセット</button>
+</div>
+</div>
+<div id="confirmMsg"></div>
+</div>
+<div class="qs" id="qs"></div>
+<div id="bd"></div>
+<div id="tb"></div>
+</div>
+<div id="resetModal" class="modal-bg" style="display:none">
+<div class="modal-card">
+<div class="modal-t">全データをリセット</div>
+<div class="modal-m">記録・カウンター・履歴をすべて削除します。この操作は取り消せません。</div>
+<div class="modal-btns">
+<button class="modal-cancel" data-a="reset-cancel">キャンセル</button>
+<button class="modal-ok" data-a="reset-confirm">削除する</button>
+</div>
+</div>
+</div>
+
+<!-- ====================================================================
+     ★★★ ここだけ機種ごとに編集する（MACHINE オブジェクト） ★★★
+     下記はサンプル（攻殻機動隊を簡略化したデモデータ）。
+     ==================================================================== -->
+<script id="machine">
+var MACHINE = {
+  id: "tokyoghoul",
+  title: "東京喰種 SETTING NAVI",
+  subtitle: "スマスロ 東京喰種 設定判別 ＆ 実戦ナビ",
+  theme: { primary:"#C8102E", accent:"#7B2FBE", bg:"#08050a" },
+
+  rates: {
+    cz:   { label:"CZ",        denom:[262.6,255.6,246.5,233.1,216.4,203.7] },
+    at:   { label:"AT初当り",   denom:[394.4,380.5,357.0,325.9,291.2,261.3] },
+    ep:   { label:"エピソードBONUS",denom:[6620.2,5879.7,5114.5,4062.5,3166.7,2639.5] },
+    choku:{ label:"AT直撃",     denom:[28406.6,24453.5,18093.0,12019.5,8615.4,7036.8] },
+    kakugan:{ label:"赫眼リプレイ",denom:[1260.3,1213.6,1170.3,1129.9,1092.3,1024.0] }
+  },
+  kw: [97.5,99.0,101.6,105.6,110.3,114.9],
+
+  pcts: {
+    g100:    { label:"100G以内CZ当選率", values:[19.6,21.0,23.2,26.4,32.0,36.0] },
+    modori:  { label:"AT引き戻し率",     values:[7.81,7.81,9.38,10.94,12.50,15.23] },
+    uraat:   { label:"初回裏AT選択率",   values:[1.10,1.32,1.63,2.19,2.85,3.32] },
+    seishin: { label:"精神世界 保証33G選択率", values:[3.1,3.1,6.3,9.4,10.9,12.5] }
+  },
+
+  events: [
+    { key:"cz", name:"CZ", sub:"レミニセンス/利世", group:"通常時", icon:"🩸",
+      fields:[
+        { type:"choice", key:"cztype", label:"CZ種別（利世は特大設定差・メニューで回数確認）",
+          options:[
+            {v:"remini", l:"レミニセンス", denom:true},
+            {v:"rize",   l:"大喰いの利世", denom:true},
+            {v:"kakutei",l:"確定/直撃CZ", denom:false}
+          ]},
+        { type:"choice", key:"trig", label:"当選G数（100G以内カウント）",
+          options:[
+            {v:"in100",  l:"100G以内", denom:true},
+            {v:"over100",l:"101G以降", denom:true}
+          ]},
+        { type:"result", key:"res", label:"成否",
+          options:[{v:"s",l:"成功",cls:"win"},{v:"f",l:"失敗",cls:"lose"}] },
+        { type:"screen", key:"czcard", label:"CZ終了画面カード（失敗時PUSH）", showIf:{res:"f"},
+          options:[
+            {v:"def",     l:"通常/モード示唆"},
+            {v:"juzo",    l:"鈴屋什造",confirm:2},
+            {v:"fukurou", l:"梟",confirm:4},
+            {v:"arima",   l:"有馬貴将",confirm:6}
+          ]},
+        { type:"note" }
+      ],
+      stat:{ countsAs:"cz", denomField:"cztype", failField:"res", failValue:"f" }
+    },
+    { key:"ep", name:"エピソードBONUS", sub:"AT直行(特大設定差)", group:"通常時", icon:"📖",
+      fields:[ {type:"note"} ],
+      stat:{ countsAs:"ep" }
+    },
+    { key:"choku", name:"AT直撃", sub:"リプレイ直撃(EP除く)", group:"通常時", icon:"⚡",
+      fields:[ {type:"note"} ],
+      stat:{ countsAs:"choku" }
+    },
+    { key:"seishin", name:"精神世界", sub:"超高確 保証G数", group:"通常時", icon:"🌀",
+      fields:[
+        { type:"choice", key:"hosho", label:"表示G数（保証33Gに設定差）",
+          options:[
+            {v:"g10",l:"10G(保証13G)"},
+            {v:"g20",l:"20G(保証23G)"},
+            {v:"g30",l:"30G(保証33G)"}
+          ]},
+        { type:"result", key:"res", label:"CZ当選した？",
+          options:[{v:"s",l:"当選",cls:"win"},{v:"f",l:"非当選",cls:"lose"}] },
+        { type:"note" }
+      ],
+      stat:{ countsAs:"seishin_hit" }
+    },
+    { key:"zenchou", name:"前兆(東京上空)", sub:"本前兆期待度示唆", group:"通常時", icon:"🌆",
+      fields:[
+        { type:"choice", key:"effect", label:"東京上空エフェクト色",
+          options:[
+            {v:"normal",l:"通常"},
+            {v:"red",   l:"赤(期待度大幅UP)"}
+          ]},
+        { type:"choice", key:"g50", label:"50G移行？(天国濃厚)",
+          options:[
+            {v:"y",l:"50Gで移行"},
+            {v:"n",l:"それ以外"}
+          ]},
+        { type:"result", key:"res", label:"CZ以上当選した？",
+          options:[{v:"s",l:"当選",cls:"win"},{v:"f",l:"ハズレ",cls:"lose"}] },
+        { type:"note" }
+      ]
+    },
+    { key:"kakugan", name:"赫眼リプレイ", sub:"下段リプレイ(通常/AT問わず・設定差小)", group:"その他", icon:"🔴",
+      fields:[ {type:"note"} ],
+      stat:{ countsAs:"kakugan" }
+    },
+    { key:"freeze", name:"ロングフリーズ", sub:"確定チェリーの約1/6", group:"通常時", icon:"❄️",
+      fields:[ {type:"number",key:"mai",label:"初期枚数(約2000枚)"}, {type:"note"} ]
+    },
+    { key:"kakuche", name:"確定チェリー", sub:"中段チェリー", group:"通常時", icon:"🍒",
+      fields:[ {type:"note"} ]
+    },
+    { key:"at", name:"AT初当り", sub:"東京喰種咬", group:"AT・上位", icon:"🎰",
+      fields:[
+        { type:"choice", key:"keiyu", label:"突入契機",
+          options:[
+            {v:"cz", l:"CZ経由"},
+            {v:"ep", l:"EP経由"},
+            {v:"choku",l:"直撃"}
+          ]},
+        { type:"choice", key:"ura", label:"裏ATスタート？(ネガポジ濃厚)",
+          options:[
+            {v:"omote",l:"通常"},
+            {v:"ura",  l:"裏AT"}
+          ]},
+        { type:"number", key:"mai", label:"獲得枚数（任意）" },
+        { type:"screen", key:"endscr", label:"AT終了画面", showIf:{},
+          options:[
+            {v:"def",   l:"デフォルト"},
+            {v:"odd",   l:"亜門+真戸(奇数)"},
+            {v:"even",  l:"什造+篠原(偶数)"},
+            {v:"rize",  l:"神代利世(設1否定)"},
+            {v:"hi_w",  l:"笛口姉妹(高設定弱)"},
+            {v:"hi_s",  l:"ウタ等(高設定強)"},
+            {v:"kin",   l:"金木+董香(金)",confirm:4},
+            {v:"niji",  l:"あんてぃく集合(虹)",confirm:6}
+          ]},
+        { type:"screen", key:"trophy", label:"ナミちゃんトロフィー",
+          options:[
+            {v:"none", l:"なし"},
+            {v:"kuro", l:"黒(継続示唆)"},
+            {v:"kin",  l:"金",confirm:4},
+            {v:"shu",  l:"喰種",confirm:5},
+            {v:"niji", l:"虹",confirm:6}
+          ]},
+        { type:"screen", key:"mai_ovr", label:"獲得枚数表示の示唆", showIf:{},
+          options:[
+            {v:"none",l:"なし"},
+            {v:"456", l:"456OVER",confirm:4},
+            {v:"666", l:"666OVER",confirm:6},
+            {v:"1000",l:"1000-7OVER",confirm:6}
+          ]},
+        { type:"note" }
+      ],
+      stat:{ countsAs:"at" }
+    },
+    { key:"battle", name:"喰種対決", sub:"AT中バトルCZ", group:"AT・上位", icon:"👊",
+      fields:[
+        { type:"choice", key:"enemy", label:"対戦相手(期待度)",
+          options:[
+            {v:"shachi",l:"鯱40%"},
+            {v:"ayato", l:"絢都47%"},
+            {v:"yamori",l:"ヤモリ53%"},
+            {v:"toku",  l:"特等ら76%"},
+            {v:"amon",  l:"亜門86%"},
+            {v:"arima", l:"有馬乱入67%"}
+          ]},
+        { type:"result", key:"res", label:"勝敗",
+          options:[{v:"s",l:"勝利",cls:"win"},{v:"f",l:"敗北",cls:"lose"}] },
+        { type:"note" }
+      ]
+    },
+    { key:"bites", name:"バイツ(BITES)", sub:"報酬特化ゾーン", group:"AT・上位", icon:"🍴",
+      fields:[
+        { type:"choice", key:"rank", label:"バイツ種別",
+          options:[
+            {v:"bites", l:"BITES"},
+            {v:"super", l:"超BITES"},
+            {v:"goku",  l:"極BITES"}
+          ]},
+        { type:"number", key:"mai", label:"獲得枚数（任意）" },
+        { type:"note" }
+      ]
+    },
+    { key:"tokka", name:"特化ゾーン", sub:"百足覚醒/隻眼の梟", group:"AT・上位", icon:"💥",
+      fields:[
+        { type:"choice", key:"type", label:"種別",
+          options:[
+            {v:"mukade", l:"百足覚醒(約300枚)"},
+            {v:"fukurou",l:"隻眼の梟(約500枚)"}
+          ]},
+        { type:"number", key:"mai", label:"上乗せ枚数（任意）" },
+        { type:"note" }
+      ]
+    },
+    { key:"arima", name:"有馬ジャッジメント", sub:"上位CZ 約61%", group:"AT・上位", icon:"⚔️",
+      fields:[
+        { type:"result", key:"res", label:"突破成否",
+          options:[{v:"s",l:"成功",cls:"win"},{v:"f",l:"失敗",cls:"lose"}] },
+        { type:"choice", key:"ura", label:"裏AT移行？(レア役突破は濃厚)",
+          options:[
+            {v:"omote",l:"通常AT"},
+            {v:"ura",  l:"裏AT"}
+          ]},
+        { type:"note" }
+      ]
+    },
+    { key:"ending", name:"エンディング到達", sub:"カード設定示唆", group:"AT・上位", icon:"🏆",
+      fields:[
+        { type:"screen", key:"edcard", label:"エンディングカード", showIf:{},
+          options:[
+            {v:"normal",l:"青/赤など"},
+            {v:"kaneki",l:"金木研(銀)",confirm:3},
+            {v:"rize",  l:"神代利世(金)",confirm:4},
+            {v:"fukurou",l:"隻眼の梟(金)",confirm:5},
+            {v:"arima", l:"有馬貴将(虹)",confirm:6}
+          ]},
+        { type:"note" }
+      ]
+    },
+    { key:"shotai", name:"招待状", sub:"設定/G数示唆", group:"その他", icon:"✉️",
+      fields:[
+        { type:"screen", key:"card", label:"招待状の内容",
+          options:[
+            {v:"normal", l:"通常(G数示唆)"},
+            {v:"guusu",  l:"偶にはディナー(偶数)"},
+            {v:"zonbun", l:"存分に楽しもう(金)",confirm:4},
+            {v:"tokubetu",l:"特別な夜を楽しもう(虹)",confirm:6}
+          ]},
+        { type:"note" }
+      ]
+    },
+    { key:"eyecatch", name:"アイキャッチ", sub:"モード/前兆示唆", group:"その他", icon:"🎴",
+      fields:[
+        { type:"screen", key:"chara", label:"出現キャラ",
+          options:[
+            {v:"kaneki", l:"金木研(デフォ)"},
+            {v:"touka",  l:"董香(B以上)"},
+            {v:"hinami", l:"雛実(C以上)"},
+            {v:"tukiyama",l:"月山習(前兆期待UP)"},
+            {v:"rize",   l:"利世(前兆大幅UP)"},
+            {v:"kaku",   l:"赫眼キャラ(100G以内CZ)"},
+            {v:"rize_kaku",l:"赫眼利世(CZ復活)"}
+          ]},
+        { type:"note" }
+      ]
+    },
+    { key:"shoku", name:"喰ポイント解放", sub:"穢れMAX→BITES", group:"その他", icon:"🩹",
+      fields:[ {type:"note"} ]
+    },
+    { key:"other", name:"その他", sub:"メモ", group:"その他", icon:"⚙️",
+      fields:[ {type:"note"} ] }
+  ],
+
+  counters: [
+    { group:"ナミちゃんトロフィー（出たら+1）" },
+    { key:"tr_kin",  name:"金トロフィー",     confirm:4, badge:"設4以上濃厚" },
+    { key:"tr_shu",  name:"喰種トロフィー",   confirm:5, badge:"設5以上濃厚" },
+    { key:"tr_niji", name:"虹トロフィー",     confirm:6, badge:"設6濃厚" },
+    { group:"AT・CZ終了画面（出たら+1）" },
+    { key:"at_kin",  name:"AT終了 金(金木+董香)", confirm:4, badge:"設4以上濃厚" },
+    { key:"at_niji", name:"AT終了 虹(あんてぃく集合)", confirm:6, badge:"設6濃厚" },
+    { key:"cz_juzo", name:"CZ後 鈴屋什造",    confirm:2, badge:"偶数濃厚" },
+    { key:"cz_fukurou", name:"CZ後 梟カード",  confirm:4, badge:"設4以上濃厚" },
+    { key:"cz_arima",   name:"CZ後 有馬貴将",  confirm:6, badge:"設6濃厚" },
+    { group:"エンディングカード（出たら+1）" },
+    { key:"ed_kaneki", name:"金木研(銀)",     confirm:3, badge:"設3以上濃厚" },
+    { key:"ed_rize",   name:"神代利世(金)",   confirm:4, badge:"設4以上濃厚" },
+    { key:"ed_fukurou",name:"隻眼の梟(金)",   confirm:5, badge:"設5以上濃厚" },
+    { key:"ed_arima",  name:"有馬貴将(虹)",   confirm:6, badge:"設6濃厚" },
+    { group:"招待状・獲得枚数（出たら+1）" },
+    { key:"in_zonbun", name:"招待状 存分に楽しもう", confirm:4, badge:"設4以上濃厚" },
+    { key:"in_toku",   name:"招待状 特別な夜",  confirm:6, badge:"設6濃厚" },
+    { key:"mai_456",   name:"456OVER",        confirm:4, badge:"設4以上濃厚" },
+    { key:"mai_666",   name:"666OVER",        confirm:6, badge:"設6濃厚" },
+    { key:"mai_1000",  name:"1000-7OVER",     confirm:6, badge:"設6濃厚" }
+  ],
+
+  info: [
+    { title:"大喰いの利世（上位CZ・特大設定差）", rows:[
+      ["設1","1/2079.1"],
+      ["設2","1/1906.5"],
+      ["設3","1/1722.8"],
+      ["設4","1/1478.9",4],
+      ["設5","1/1226.6"],
+      ["設6","1/1074.9",6]
+    ]},
+    { title:"AT終了画面", rows:[
+      ["金木研","デフォルト"],
+      ["亜門鋼太朗＆真戸暁","奇数示唆"],
+      ["鈴屋什造＆篠原幸紀","偶数示唆"],
+      ["神代利世","設定1否定"],
+      ["笛口姉妹","高設定示唆（弱）"],
+      ["ウタ＆イトリ＆四方","高設定示唆（強）"],
+      ["金木研＆霧嶋董香(金)","設4以上濃厚",4],
+      ["あんてぃく全員集合(虹)","設6濃厚",6]
+    ]},
+    { title:"ナミちゃんトロフィー", rows:[
+      ["黒","継続示唆（次回もトロフィー濃厚）"],
+      ["金","設4以上濃厚",4],
+      ["喰種","設5以上濃厚",5],
+      ["虹","設6濃厚",6]
+    ]},
+    { title:"CZ終了画面カード（設定示唆）", rows:[
+      ["鈴屋什造","偶数設定濃厚",2],
+      ["梟(金枠)","設4以上濃厚",4],
+      ["有馬貴将(虹枠)","設6濃厚",6]
+    ]},
+    { title:"エンディングカード", rows:[
+      ["金木研(銀)","設3以上濃厚",3],
+      ["神代利世(金)","設4以上濃厚",4],
+      ["隻眼の梟(金)","設5以上濃厚",5],
+      ["有馬貴将(虹)","設6濃厚",6]
+    ]},
+    { title:"月山招待状（設定示唆）", rows:[
+      ["偶にはディナーでも～","偶数設定示唆",2],
+      ["不思議な香りだ…","設定1否定"],
+      ["存分に楽しもう～","設4以上濃厚",4],
+      ["特別な夜を楽しもう～","設6濃厚",6]
+    ]},
+    { title:"獲得枚数表示(OVER)", rows:[
+      ["456OVER","設4以上濃厚",4],
+      ["666OVER","設6濃厚",6],
+      ["1000-7OVER(993枚)","設6濃厚",6]
+    ]},
+    { title:"超高確中のCZ当選率（弱チェ/スイカ）", rows:[
+      ["設1","弱40.3% / スイカ13.7%"],
+      ["設4","弱50.7% / スイカ17.2%"],
+      ["設6","弱64.4% / スイカ22.0%",6]
+    ]},
+    { title:"弱チェリーのCZ当選率(設定差小)", rows:[
+      ["通常時","設1 0.27%→設6 0.43%"],
+      ["高確時","設1 0.59%→設6 0.95%"]
+    ]},
+    { title:"アイキャッチ(モード/前兆示唆)", rows:[
+      ["金木研","デフォルト"],
+      ["霧嶋董香","モードB以上のチャンス"],
+      ["笛口雛実","モードC以上のチャンス"],
+      ["月山習(白)","本前兆期待度アップ"],
+      ["神代利世(白)","本前兆期待度 大幅アップ"],
+      ["赫眼キャラ(赤)","100G以内のCZ当選濃厚"],
+      ["神代利世(赫眼)","CZ復活濃厚"]
+    ]},
+    { title:"精神世界(超高確) 保証G数", rows:[
+      ["10G表示(保証13G)","低設定ほど選ばれやすい"],
+      ["20G表示(保証23G)","中間"],
+      ["30G表示(保証33G)","高設定ほど選択(設1×4倍が設6)",6]
+    ]},
+    { title:"喰種対決 対戦相手別 勝利期待度", rows:[
+      ["鯱","40.0%"],
+      ["霧嶋絢都","47.0%"],
+      ["ヤモリ","53.0%"],
+      ["特等ら","76.0%"],
+      ["亜門","86.0%"],
+      ["VS有馬","67.0%（勝利でジャッジ権利）"]
+    ]}
+  ],
+
+  guide: [
+    { title:"ゲームフロー", html:"<div class='ib'><p>通常時(レア役/規定G)→<span class='em'>CZ(レミニセンス約52%/大喰いの利世約75%)</span>→AT「東京喰種咬」。AT中は<span class='em'>喰種対決(約1/49)</span>勝利でBITESへ。差枚数管理型・純増約4.0枚/G・初期約150G。EP BONUSはAT直行。</p></div>" },
+    { title:"天井（2段階）", html:"<div class='ib'><p><span class='em'>CZ間天井：600G+α</span>（液晶表示G数）でCZ当選。<br><span class='em'>AT間天井：1200G+α</span>（実G/メニュー確認）でAT直撃。</p><p>※設定変更後はCZ天井が<span class='em'>200G+α</span>に短縮。CZ天井はスイカで加算あり。</p></div>" },
+    { title:"狙い目・リセット", html:"<div class='ib'><p>等価で<span class='em'>450G〜</span>、5.6枚交換で<span class='em'>500G〜</span>。リセット濃厚台は<span class='em'>0Gから期待値プラス</span>（CZ天井200G短縮・朝一専用モード）。AT間1000G超え放置はAT間天井(直撃)も射程。</p></div>" },
+    { title:"やめどき", html:"<div class='ib'><p><span class='em'>有馬貴将ジャッジメント失敗後は100G+αで必ずCZ当選</span>＝即ヤメ厳禁。AT終了後は<span class='em'>引き戻し・即前兆を5G以上</span>確認。アイキャッチで赤(赫眼)＝100G以内CZ濃厚。50Gで東京上空移行＝天国濃厚。</p></div>" },
+    { title:"内部状態・ステージ", html:"<div class='ib'><p>通常/高確/超高確の3状態。<span class='em'>昼間＜夕暮れ＜夜更け</span>で高確以上に期待。超高確は<span class='em'>精神世界</span>に対応。AT中ステージは通常＜高確＜対決準備（対決濃厚）。</p></div>" },
+    { title:"赫眼(カクガン)状態", html:"<div class='ib'><p>下段リプレイ成立で発動するチェリー高確（レア役約1/2.6・10〜50G）。下段リプレイ確率に設定差（設1:1/1260→設6:1/1024）。特化ゾーンに絡むと出玉が一気に加速。</p></div>" },
+    { title:"精神世界(超高確)", html:"<div class='ib'><p>超高確対応ステージ。表示<span class='em'>10/20/30G＝保証13/23/33G</span>で、<span class='em'>33G選択率に大設定差（設1×4倍が設6）</span>。弱チェ約40〜64%・スイカ約14〜22%でCZ当選（高設定優遇）。</p></div>" },
+    { title:"前兆・東京上空", html:"<div class='ib'><p>レア役/規定G数で前兆ステージ<span class='em'>「東京上空」</span>へ移行し本前兆期待度を示唆。<span class='em'>赤エフェクトで期待度大幅UP</span>。50Gゾーン移行＝<span class='em'>天国濃厚</span>。前兆中は精神世界へ移行しない点に注意。</p></div>" },
+    { title:"喰種対決・VS有馬", html:"<div class='ib'><p>AT中レア役/規定G(最大150G)で突入する4Gバトル(約1/49・平均約50%)。対戦相手で期待度が変化(鯱40%〜亜門86%)。<span class='em'>有馬乱入(約67%)勝利で有馬貴将ジャッジメント権利</span>。モノクロ画面は確定対決(勝利濃厚)。</p></div>" },
+    { title:"バイツ(BITES)", html:"<div class='ib'><p>喰種対決勝利で突入する報酬特化ゾーン。<span class='em'>小役入賞ごとに報酬ランクUP</span>(小役約1/2.2)、ハズレ目で終了のピンチ。終了時<span class='em'>20%で復活(RETRY)</span>。上位に<span class='em'>超BITES(300〜3000枚)／極BITES(2000枚orEND濃厚)</span>。</p></div>" },
+    { title:"特化ゾーン(喰図柄揃い)", html:"<div class='ib'><p>AT中の喰図柄揃いで突入。<span class='em'>百足覚醒</span>＝5セット保証・約300枚、<span class='em'>隻眼の梟</span>＝1G完結・約500枚。</p></div>" },
+    { title:"有馬貴将ジャッジメント", html:"<div class='ib'><p>AT終了後/VS有馬勝利後/エンディング後の上位CZ。<span class='em'>5G継続・突破期待度約61%</span>。成功で<span class='em'>CCGの死神</span>(約+500枚)→AT再突入。レア役は成功濃厚、最終Gは斜めベル/リプレイでも成功濃厚。成功時は<span class='em'>裏AT大チャンス</span>(レア役突破は裏AT濃厚)。金セリフ「ここから先喰種は～」で成功＋裏AT濃厚。<span class='em'>失敗後も天国濃厚</span>で100G+αフォロー。</p></div>" },
+    { title:"裏AT", html:"<div class='ib'><p>AT初当り時の一部(設定差あり)・ジャッジメント成功時の一部で突入する上位AT。<span class='em'>喰種対決の勝利期待度が大幅UP・有馬乱入優遇</span>、期待枚数約3430枚。突入画面の<span class='em'>ネガポジで裏AT濃厚</span>。</p></div>" },
+    { title:"喰ポイント(穢れ)", html:"<div class='ib'><p>CZ失敗・AT駆け抜けで蓄積。<span class='em'>MAX到達後のAT当選でBITESを1個ストック</span>。リセット時は初期pt振り分けあり。CZ失敗が続いても無駄にならない救済要素。</p></div>" },
+    { title:"ロングフリーズ", html:"<div class='ib'><p>確定チェリー成立時の約1/6で発生(実質約1/98304)。<span class='em'>初期2000枚のAT濃厚・期待約4400枚</span>のプレミア。</p></div>" },
+    { title:"アイキャッチのモード示唆", html:"<div class='ib'><p>ステチェン/連続演出失敗/CZ・AT終了後に出現。<span class='em'>董香＝B以上、雛実＝C以上</span>のチャンス。<span class='em'>赤(赫眼)キャラ＝100G以内CZ濃厚</span>で即ヤメ厳禁。月山習・神代利世の白は本前兆期待度UP(利世は大幅UP)。赫眼利世はCZ復活濃厚。</p></div>" },
+    { title:"設定判別の優先度", html:"<div class='ib'><p>メイン：<span class='em'>AT初当り確率／100G以内CZ当選率</span>。特大設定差：<span class='em'>大喰いの利世・エピソードBONUS・AT直撃・引き戻し</span>。朝一は全設定優遇のため過信厳禁。本番はAT初当り以降の挙動。</p></div>" }
+  ],
+
+  source: "出典：DMMぱちタウン／一撃／なな徹（パチーモ）を3ソース照合。機械割・設定差・実践値を含むため最終判断は自己責任で。"
+};
+</script>
+
+<!-- ====================================================================
+     共通エンジン（原則不変）
+     ==================================================================== -->
+<script>
+'use strict';
+var M = MACHINE;
+var SK = M.id;
+var CC={}, LOG=[], cur={}, curTab='rec';
+
+/* utils */
+function $(s){return document.querySelector(s);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function clamp(n,a,b){return Math.max(a,Math.min(b,n));}
+function cc(k){return CC[k]||0;}
+
+function save(){try{localStorage.setItem(SK+'c',JSON.stringify(CC));localStorage.setItem(SK+'l',JSON.stringify(LOG));}catch(e){}}
+function load(){try{CC=JSON.parse(localStorage.getItem(SK+'c')||'{}')||{};LOG=JSON.parse(localStorage.getItem(SK+'l')||'[]')||[];}catch(e){CC={};LOG=[];}}
+function inc(k,d){CC[k]=Math.max(0,(CC[k]||0)+d);save();render();}
+function incSilent(k,d){CC[k]=Math.max(0,(CC[k]||0)+d);}
+
+/* 推定エンジン */
+function rateGuess(hits,total,denom){
+  if(!total||!hits)return null;
+  var actual=total/hits,best=-1,bd=1e9;
+  for(var s=0;s<6;s++){var d=Math.abs(denom[s]-actual);if(d<bd){bd=d;best=s+1;}}
+  return {actual:actual,best:best};
+}
+function pctGuess(hit,total,pcts){
+  if(!total)return null;
+  var actual=hit/total*100,best=-1,bd=1e9;
+  for(var s=0;s<6;s++){var d=Math.abs(pcts[s]-actual);if(d<bd){bd=d;best=s+1;}}
+  return {actual:actual,best:best};
+}
+
+/* イベント定義の検索 */
+function evDef(k){for(var i=0;i<M.events.length;i++)if(M.events[i].key===k)return M.events[i];return null;}
+
+/* 総G数（AT/BN中Gを除外する区間最大値方式） */
+function totalG(){
+  var total=0;
+  for(var i=0;i<LOG.length;i++){var g=parseInt(LOG[i].g,10);if(!isNaN(g)&&g>0)total+=g;}
+  return total;
+}
+
+/* 統計集計（events[].stat 宣言を解釈） */
+function stats(){
+  var out={ totG:totalG() };
+  // 各 countsAs ごとに hit/denom を集計
+  var bucket={};
+  function B(k){if(!bucket[k])bucket[k]={hit:0,denom:0,fail:0};return bucket[k];}
+  for(var i=0;i<LOG.length;i++){
+    var e=LOG[i],def=evDef(e.ev);
+    if(!def||!def.stat)continue;
+    var st=def.stat, ca=st.countsAs;
+    if(!ca)continue;
+    var b=B(ca);
+    // 母数算入の判定
+    var inDenom=true;
+    if(st.denomField){
+      var fv=e[st.denomField];
+      var fld=null;
+      for(var f=0;f<def.fields.length;f++)if(def.fields[f].key===st.denomField)fld=def.fields[f];
+      if(fld&&fld.options){
+        for(var o=0;o<fld.options.length;o++)if(fld.options[o].v===fv&&fld.options[o].denom===false)inDenom=false;
+      }
+    }
+    if(inDenom){b.denom++; b.hit++;}
+    // 失敗カウント
+    if(st.failField&&e[st.failField]===st.failValue)b.fail++;
+  }
+  out.bucket=bucket;
+  return out;
+}
+
+/* 確定判定：counters[].confirm ＋ screenフィールドのconfirm */
+function confirmedMin(){
+  var min=1, reasons=[];
+  function bump(v,why){if(v>min)min=v;if(v>=2)reasons.push(why+'→設'+v+(v===6?'':'以上')+'濃厚');}
+  (M.counters||[]).forEach(function(c){ if(c.key&&c.confirm&&cc(c.key))bump(c.confirm,c.name); });
+  // 記録された画面のconfirm
+  for(var i=0;i<LOG.length;i++){
+    var e=LOG[i],def=evDef(e.ev);if(!def)continue;
+    (def.fields||[]).forEach(function(fld){
+      if(fld.type==='screen'&&e[fld.key]){
+        (fld.options||[]).forEach(function(o){if(o.v===e[fld.key]&&o.confirm)bump(o.confirm,def.name+'「'+o.l+'」');});
+      }
+    });
+  }
+  return {min:min,reasons:reasons};
+}
+</script>
+
+<!-- ====================================================================
+     共通レンダリング（原則不変）
+     ==================================================================== -->
+<script>
+var TABS=[
+  {k:'rec',ic:'✍️',l:'記録'},
+  {k:'cnt',ic:'🔢',l:'カウンター'},
+  {k:'nav',ic:'🧭',l:'攻略'},
+  {k:'log',ic:'📜',l:'履歴'},
+  {k:'info',ic:'💡',l:'示唆'},
+  {k:'exp',ic:'📤',l:'出力'}
+];
+
+function applyTheme(){
+  var r=document.documentElement.style;
+  if(M.theme){ if(M.theme.primary)r.setProperty('--c-primary',M.theme.primary);
+    if(M.theme.accent)r.setProperty('--c-accent',M.theme.accent);
+    if(M.theme.bg)r.setProperty('--c-bg',M.theme.bg); }
+  $('#hTitle').textContent=M.title||'';
+  $('#hSub').textContent=M.subtitle||'';
+}
+
+function render(){
+  rHdr(); rQS();
+  var bd=$('#bd');
+  if(curTab==='rec')bd.innerHTML=rRec();
+  else if(curTab==='cnt')bd.innerHTML=rCnt();
+  else if(curTab==='nav')bd.innerHTML=rNav();
+  else if(curTab==='log')bd.innerHTML=rLog();
+  else if(curTab==='info')bd.innerHTML=rInfo();
+  else if(curTab==='exp')bd.innerHTML=rExp();
+  rTabs();
+}
+
+function rTabs(){
+  var h='';
+  TABS.forEach(function(t){h+='<div class="tab'+(t.k===curTab?' on':'')+'" data-tab="'+t.k+'"><span class="ic">'+t.ic+'</span>'+t.l+'</div>';});
+  $('#tb').innerHTML=h;
+}
+
+function rHdr(){
+  var cf=confirmedMin(),b=$('#setBtn'),m=$('#confirmMsg');
+  if(cf.min>1){
+    b.className='hb p';b.textContent='設'+cf.min+(cf.min===6?' 確定':'以上');
+    m.className='cfm';m.style.background='rgba(255,61,127,.1)';m.style.border='1px solid rgba(255,61,127,.3)';m.style.color='#ff9bbd';
+    m.innerHTML='🔓 '+esc(cf.reasons.join(' / '));
+  }else{ b.className='hb';b.textContent='示唆 −';m.className='';m.innerHTML=''; }
+}
+
+function rQS(){
+  var st=stats(),html='';
+  html+='<div class="qc"><span class="l">総G数</span><span class="v">'+(st.totG||0)+'</span></div>';
+  // rates の各項目をクイック表示
+  for(var key in M.rates){
+    var r=M.rates[key],b=st.bucket[key]||{hit:0},g=rateGuess(b.hit,st.totG,r.denom);
+    html+='<div class="qc"><span class="l">'+esc(r.label)+' '+(b.hit||0)+'回</span><span class="v">'+(b.hit&&st.totG?('1/'+Math.round(st.totG/b.hit)):'—')+'</span>'+(g?'<span class="v2">≒設'+g.best+'</span>':'')+'</div>';
+  }
+  $('#qs').innerHTML=html;
+}
+
+/* ---- 記録タブ ---- */
+function rRec(){
+  var h='<div class="card glow"><div class="ct">イベント記録 <span class="tag">G数→項目→記録</span></div>';
+  h+='<div class="fld"><div class="fl">消化G数</div><div class="gi"><input id="iG" type="number" inputmode="numeric" placeholder="G数を入力" value="'+esc(cur.g||'')+'"></div></div>';
+
+  if(!cur.ev){
+    var groups={};
+    M.events.forEach(function(e){(groups[e.group||'その他']=groups[e.group||'その他']||[]).push(e);});
+    h+='<div class="fld"><div class="fl">イベント</div>';
+    for(var gn in groups){
+      h+='<div class="egrp"><span class="egrp-h">'+esc(gn)+'</span><div class="eg">';
+      groups[gn].forEach(function(e){
+        h+='<button class="eb" data-ev="'+e.key+'">'+esc(e.name)+'<span class="es">'+esc(e.sub||'')+'</span></button>';
+      });
+      h+='</div></div>';
+    }
+    h+='</div>';
+  }else{
+    var def=evDef(cur.ev);
+    h+='<div class="fld"><div class="fl">イベント</div><div class="eg" style="grid-template-columns:1fr auto">';
+    h+='<button class="eb on" data-ev="'+cur.ev+'">'+esc(def.name)+'<span class="es">'+esc(def.sub||'')+'</span></button>';
+    h+='<button class="eb" data-a="evchange" style="min-width:84px">🔄 変更</button></div></div>';
+    // フィールド生成
+    (def.fields||[]).forEach(function(fld){ h+=renderField(fld); });
+  }
+
+  h+='<button class="addb" data-a="add"'+(cur.ev?'':' disabled')+'>'+(cur.ev?'記録する':'イベントを選択')+'</button></div>';
+
+  if(LOG.length){
+    h+='<div class="card"><div class="ct">直近の記録 <span class="tag">×で削除</span></div>';
+    for(var i=LOG.length-1;i>=Math.max(0,LOG.length-4);i--)h+=tlItem(LOG[i],i,false);
+    h+='</div>';
+  }
+  return h;
+}
+
+function renderField(fld){
+  // showIf 条件
+  if(fld.showIf){ for(var k in fld.showIf){ if(cur[k]!==fld.showIf[k])return ''; } }
+  if(fld.type==='note'){
+    return '<div class="fld"><div class="fl">メモ（任意）</div><textarea id="iNote" rows="2" placeholder="所感など">'+esc(cur.note||'')+'</textarea></div>';
+  }
+  if(fld.type==='number'){
+    return '<div class="fld"><div class="fl">'+esc(fld.label||'')+'</div><div class="gi"><input data-num="'+fld.key+'" type="number" inputmode="numeric" value="'+esc(cur[fld.key]||'')+'"></div></div>';
+  }
+  if(fld.type==='choice'||fld.type==='result'){
+    var h='<div class="fld"><div class="fl">'+esc(fld.label||'')+'</div><div class="seg">';
+    (fld.options||[]).forEach(function(o){
+      var on=cur[fld.key]===o.v;
+      h+='<button class="so'+(o.cls?' '+o.cls:'')+(on?' on':'')+'" data-seg="'+fld.key+'" data-val="'+o.v+'">'+esc(o.l)+'</button>';
+    });
+    h+='</div></div>';return h;
+  }
+  if(fld.type==='screen'){
+    var h2='<div class="fld"><div class="fl">'+esc(fld.label||'')+'</div><div class="eg">';
+    (fld.options||[]).forEach(function(o){
+      var on=cur[fld.key]===o.v;
+      h2+='<button class="eb'+(on?' on':'')+'" data-seg="'+fld.key+'" data-val="'+o.v+'">'+esc(o.l)+(o.confirm?'<span class="es">設'+o.confirm+(o.confirm===6?'':'↑')+'</span>':'')+'</button>';
+    });
+    h2+='</div></div>';return h2;
+  }
+  return '';
+}
+
+/* ---- カウンタータブ ---- */
+function rCnt(){
+  var st=stats(),h='';
+  // 自動集計：基本確率
+  h+='<div class="card glow"><div class="ct">📊 基本確率 <span class="tag">自動集計</span></div>';
+  h+='<table class="itbl"><tr><th>項目</th><th>回数</th><th>確率</th><th>≒設定</th></tr>';
+  h+='<tr><td class="k">総G数</td><td colspan="3">'+(st.totG||0)+' G</td></tr>';
+  for(var key in M.rates){
+    var r=M.rates[key],b=st.bucket[key]||{hit:0},g=rateGuess(b.hit,st.totG,r.denom);
+    h+='<tr><td class="k">'+esc(r.label)+'</td><td>'+(b.hit||0)+'</td><td class="h">'+(b.hit&&st.totG?('1/'+Math.round(st.totG/b.hit)):'—')+'</td><td>'+(g?'設'+g.best:'—')+'</td></tr>';
+  }
+  h+='</table>';
+  if(!st.totG)h+='<div class="sub">記録タブでG数とイベントを記録すると確率が出ます。</div>';
+  h+='</div>';
+
+  // %系の推定（pctsの各項目について _hit バケットがあれば）
+  var pctHtml='';
+  for(var pk in M.pcts){
+    var p=M.pcts[pk],b2=st.bucket[pk+'_hit'];
+    if(b2&&b2.hit){
+      // 分母は同名rate or 別途。ここでは hit のみ表示
+      pctHtml+=estBar(p.label,b2.hit,b2.hit,p.values);
+    }
+  }
+  if(pctHtml)h+='<div class="card glow"><div class="ct">🎯 当選率の設定推定</div>'+pctHtml+'</div>';
+
+  // 手動カウンター
+  h+='<div class="sub" style="margin:10px 0 6px">▼ 手動で計上する設定示唆（出たら+1）</div>';
+  var open=false;
+  (M.counters||[]).forEach(function(d){
+    if(d.group){ if(open)h+='</div>'; h+='<div class="card"><div class="ct">'+esc(d.group)+'</div>';open=true;return; }
+    var n=cc(d.key),act=n>0;
+    h+='<div class="crow'+(act?' active':'')+'"><div class="cinfo"><div class="cnm">'+esc(d.name)+'</div>';
+    if(d.badge)h+='<span class="cbadge">'+esc(d.badge)+'</span>';
+    h+='</div><div class="cw"><button class="cmin" data-cm="'+d.key+'">−</button><div class="cval">'+n+'</div><button class="cplus" data-cp="'+d.key+'">＋</button></div></div>';
+  });
+  if(open)h+='</div>';
+  return h;
+}
+function estBar(name,hit,total,pcts){
+  var g=pctGuess(hit,total,pcts);
+  var h='<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:rgba(255,255,255,.7);font-weight:700">'+esc(name)+'</span><span style="color:#7fe9dc;font-family:monospace">'+(total?(hit+'/'+total+' = '+(hit/total*100).toFixed(1)+'%'):'—')+'</span></div>';
+  for(var s=0;s<6;s++){
+    var pct=pcts[s],w=clamp(pct/(pcts[5]*1.15)*100,3,100),best=g&&g.best===s+1;
+    h+='<div class="sbar'+(best?' best':'')+'"><span class="sl">設'+(s+1)+'</span><span class="st"><span class="sf" style="width:'+w+'%"></span></span><span class="sv">'+pct.toFixed(1)+'%</span></div>';
+  }
+  h+='</div>';return h;
+}
+
+/* ---- 攻略タブ ---- */
+function rNav(){
+  if(!M.guide||!M.guide.length)return '<div class="tl-empty">攻略情報は未登録です。</div>';
+  var h='';
+  M.guide.forEach(function(g){h+='<div class="card"><div class="ct">'+esc(g.title)+'</div>'+(g.html||'')+'</div>';});
+  return h;
+}
+
+/* ---- 履歴タブ ---- */
+function tlItem(e,i,mini){
+  var def=evDef(e.ev),icon=def?def.icon||'•':'•',name=def?def.name:e.ev;
+  var sub=[];
+  if(def)(def.fields||[]).forEach(function(fld){
+    var v=e[fld.key];if(v==null||v==='')return;
+    if(fld.type==='note'){sub.push(esc(v));return;}
+    if(fld.options){for(var o=0;o<fld.options.length;o++)if(fld.options[o].v===v){sub.push(esc(fld.options[o].l));return;}}
+    sub.push(esc(v));
+  });
+  var h='<div class="tli"><div class="tli-i">'+icon+'</div><div class="tli-b"><div class="tli-t">'+esc(name)+'</div>';
+  if(sub.length)h+='<div class="tli-s">'+sub.join('・')+'</div>';
+  h+='</div>';
+  if(typeof e.g==='number'&&e.g>0)h+='<div class="tli-g">'+e.g+'G</div>';
+  if(!mini)h+='<button class="tli-x" data-del="'+i+'">×</button>';
+  h+='</div>';return h;
+}
+function rLog(){
+  if(!LOG.length)return '<div class="tl-empty">記録がありません。<br>「記録」タブからイベントを追加してください。</div>';
+  var h='<div class="card"><div class="ct">履歴 <span class="tag">'+LOG.length+'件</span></div>';
+  for(var i=LOG.length-1;i>=0;i--)h+=tlItem(LOG[i],i,false);
+  h+='</div>';return h;
+}
+
+/* ---- 示唆タブ ---- */
+function rInfo(){
+  var h='';
+  // 設定差データ表
+  h+='<div class="card glow"><div class="ct">📊 設定差のある抽選値</div><table class="itbl"><tr><th>設定</th>';
+  var rkeys=[];for(var k in M.rates){rkeys.push(k);h+='<th>'+esc(M.rates[k].label)+'</th>';}
+  if(M.kw)h+='<th>機械割</th>';
+  h+='</tr>';
+  for(var s=0;s<6;s++){
+    h+='<tr><td class="k">設'+(s+1)+'</td>';
+    rkeys.forEach(function(k){h+='<td>1/'+M.rates[k].denom[s].toFixed(1)+'</td>';});
+    if(M.kw)h+='<td>'+M.kw[s].toFixed(1)+'%</td>';
+    h+='</tr>';
+  }
+  h+='</table></div>';
+
+  // %系
+  if(M.pcts){
+    h+='<div class="card"><div class="ct">🎯 主な判別要素（％）</div>';
+    for(var pk in M.pcts){
+      var p=M.pcts[pk];
+      h+='<div style="font-size:11.5px;font-weight:700;color:#9fe9dd;margin:6px 0 4px">'+esc(p.label)+'</div><table class="itbl"><tr>';
+      for(var s2=0;s2<6;s2++)h+='<th>設'+(s2+1)+'</th>';h+='</tr><tr>';
+      for(var s3=0;s3<6;s3++)h+='<td class="'+(s3>=3?'h':'')+'">'+p.values[s3].toFixed(1)+'%</td>';
+      h+='</tr></table>';
+    }
+    h+='</div>';
+  }
+
+  // info カタログ
+  (M.info||[]).forEach(function(sec){
+    h+='<div class="card"><div class="ct">'+esc(sec.title)+'</div><table class="itbl"><tr><th>項目</th><th>示唆</th></tr>';
+    sec.rows.forEach(function(r){h+='<tr><td class="k">'+esc(r[0])+'</td><td class="'+(r[2]?'h':'')+'">'+esc(r[1])+'</td></tr>';});
+    h+='</table></div>';
+  });
+
+  if(M.source)h+='<div class="note">'+esc(M.source)+'</div>';
+  return h;
+}
+
+/* ---- 出力タブ ---- */
+function rExp(){
+  var st=stats(),cf=confirmedMin(),lines=[];
+  lines.push('=== '+M.title+' 実戦データ ===');
+  lines.push('総G数: '+(st.totG||0));
+  for(var key in M.rates){
+    var b=st.bucket[key]||{hit:0};
+    lines.push(M.rates[key].label+': '+(b.hit||0)+'回'+(b.hit&&st.totG?(' (1/'+Math.round(st.totG/b.hit)+')'):''));
+  }
+  if(cf.reasons.length){lines.push('');lines.push('【設定示唆】');cf.reasons.forEach(function(r){lines.push('・'+r);});}
+  lines.push('');lines.push('--- 履歴('+LOG.length+'件) ---');
+  for(var i=0;i<LOG.length;i++){
+    var e=LOG[i],def=evDef(e.ev),parts=[def?def.name:e.ev];
+    if(typeof e.g==='number'&&e.g>0)parts.push(e.g+'G');
+    if(def)(def.fields||[]).forEach(function(fld){
+      var v=e[fld.key];if(v==null||v==='')return;
+      if(fld.options){for(var o=0;o<fld.options.length;o++)if(fld.options[o].v===v){parts.push(fld.options[o].l);return;}}
+      parts.push(v);
+    });
+    lines.push((i+1)+'. '+parts.join(' / '));
+  }
+  var txt=lines.join('\n');
+  var h='<div class="card"><div class="ct">📤 データ出力</div><div class="sub">長押しで全選択できます。</div>';
+  h+='<textarea class="exp-ta" id="expTa" readonly>'+esc(txt)+'</textarea>';
+  h+='<div class="btn2"><button class="bcopy" data-a="copy">📋 コピー</button></div></div>';
+  if(M.source)h+='<div class="note">データはこの端末のブラウザ内にのみ保存されます。</div>';
+  return h;
+}
+</script>
+
+<!-- ====================================================================
+     共通イベント処理（原則不変）
+     ==================================================================== -->
+<script>
+function blankCur(){return {ev:'',g:cur.g||'',note:''};}
+
+function addEntry(){
+  if(!cur.ev)return;
+  var def=evDef(cur.ev),e={ev:cur.ev};
+  var g=parseInt(cur.g,10);if(!isNaN(g)&&g>0)e.g=g;
+  (def.fields||[]).forEach(function(fld){
+    // showIf を満たさないフィールドは保存しない（混入防止）
+    if(fld.showIf){for(var k in fld.showIf)if(cur[k]!==fld.showIf[k])return;}
+    if(fld.type==='note'){if(cur.note)e.note=String(cur.note).slice(0,200);return;}
+    if(fld.type==='number'){var n=parseInt(cur[fld.key],10);if(!isNaN(n)&&n>0)e[fld.key]=n;return;}
+    if(cur[fld.key])e[fld.key]=cur[fld.key];
+  });
+  LOG.push(e);
+  cur={ev:'',g:'',note:''};
+  save();render();
+}
+
+function doReset(){
+  CC={};LOG=[];cur={ev:'',g:'',note:''};
+  try{localStorage.removeItem(SK+'c');localStorage.removeItem(SK+'l');}catch(e){}
+  render();
+}
+
+document.addEventListener('click',function(ev){
+  var t=ev.target.closest('[data-tab],[data-ev],[data-seg],[data-a],[data-cm],[data-cp],[data-del]');
+  if(!t)return;
+  if(t.dataset.tab){curTab=t.dataset.tab;render();return;}
+  if(t.dataset.ev!=null){
+    var nv=t.dataset.ev;
+    if(cur.ev===nv)cur=blankCur();
+    else { var keepG=cur.g; cur=blankCur(); cur.ev=nv; cur.g=keepG; }
+    render();return;
+  }
+  if(t.dataset.seg){var g=t.dataset.seg,v=t.dataset.val;cur[g]=(cur[g]===v?'':v);render();return;}
+  if(t.dataset.cm){inc(t.dataset.cm,-1);return;}
+  if(t.dataset.cp){inc(t.dataset.cp,1);return;}
+  if(t.dataset.del!=null){var i=parseInt(t.dataset.del,10);if(!isNaN(i)){LOG.splice(i,1);save();render();}return;}
+  if(t.dataset.a==='evchange'){var keepG2=cur.g;cur=blankCur();cur.g=keepG2;render();return;}
+  if(t.dataset.a==='add'){addEntry();return;}
+  if(t.dataset.a==='copy'){
+    var ta=$('#expTa');if(ta){ta.select();try{document.execCommand('copy');}catch(e){}if(navigator.clipboard){try{navigator.clipboard.writeText(ta.value);}catch(e){}}t.textContent='✅ コピー完了';setTimeout(function(){t.textContent='📋 コピー';},1500);}
+    return;
+  }
+  if(t.dataset.a==='reset'){$('#resetModal').style.display='flex';return;}
+  if(t.dataset.a==='reset-cancel'){$('#resetModal').style.display='none';return;}
+  if(t.dataset.a==='reset-confirm'){$('#resetModal').style.display='none';doReset();return;}
+});
+document.addEventListener('input',function(ev){
+  var t=ev.target;
+  if(t.id==='iG')cur.g=t.value;
+  else if(t.id==='iNote')cur.note=t.value;
+  else if(t.dataset&&t.dataset.num)cur[t.dataset.num]=t.value;
+});
+$('#resetModal').addEventListener('click',function(ev){if(ev.target===this)this.style.display='none';});
+
+/* 起動 */
+cur={ev:'',g:'',note:''};
+applyTheme();
+load();
+render();
+</script>
+</body>
+</html>
