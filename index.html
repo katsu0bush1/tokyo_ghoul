@@ -254,10 +254,14 @@ var MACHINE = {
     },
     { key:"zenchou", name:"前兆(東京上空)", sub:"本前兆期待度示唆", group:"通常時", icon:"🌆",
       fields:[
-        { type:"choice", key:"effect", label:"東京上空エフェクト色",
+        { type:"screen", key:"effect", label:"発展時のエフェクト色（信頼度）",
           options:[
-            {v:"normal",l:"通常"},
-            {v:"red",   l:"赤(期待度大幅UP)"}
+            {v:"yellow",l:"黄(デフォルト)"},
+            {v:"blue",  l:"青(約50%)"},
+            {v:"green", l:"緑(チャンスUP)"},
+            {v:"red",   l:"赤(約95%)"},
+            {v:"white", l:"白(CZ以上濃厚)"},
+            {v:"niji",  l:"虹(AT濃厚)"}
           ]},
         { type:"choice", key:"g50", label:"50G移行？(天国濃厚)",
           options:[
@@ -278,6 +282,18 @@ var MACHINE = {
     },
     { key:"kakuche", name:"確定チェリー", sub:"中段チェリー", group:"通常時", icon:"🍒",
       fields:[ {type:"note"} ]
+    },
+    { key:"suika", name:"スイカ(液晶G数加算)", sub:"擬似G加算→天井管理", group:"通常時", icon:"🍉",
+      fields:[
+        { type:"choice", key:"add", label:"液晶G数の加算量（約74/25/1%）",
+          options:[
+            {v:"g10",  l:"+10G"},
+            {v:"g100", l:"+100G"},
+            {v:"max",  l:"MAX(天井到達)"}
+          ]},
+        { type:"number", key:"disp", label:"加算後の液晶G数（任意メモ）" },
+        { type:"note" }
+      ]
     },
     { key:"at", name:"AT初当り", sub:"東京喰種咬", group:"AT・上位", icon:"🎰",
       fields:[
@@ -528,6 +544,7 @@ var MACHINE = {
   guide: [
     { title:"ゲームフロー", html:"<div class='ib'><p>通常時(レア役/規定G)→<span class='em'>CZ(レミニセンス約52%/大喰いの利世約75%)</span>→AT「東京喰種咬」。AT中は<span class='em'>喰種対決(約1/49)</span>勝利でBITESへ。差枚数管理型・純増約4.0枚/G・初期約150G。EP BONUSはAT直行。</p></div>" },
     { title:"天井（2段階）", html:"<div class='ib'><p><span class='em'>CZ間天井：600G+α</span>（液晶表示G数）でCZ当選。<br><span class='em'>AT間天井：1200G+α</span>（実G/メニュー確認）でAT直撃。</p><p>※設定変更後はCZ天井が<span class='em'>200G+α</span>に短縮。CZ天井はスイカで加算あり。</p></div>" },
+    { title:"スイカの液晶G数加算（天井管理）", html:"<div class='ib'><p>CZ間天井は<span class='em'>液晶右下のG数</span>を参照する擬似G数で、<span class='em'>スイカ成立時に加算抽選</span>が入る。振り分けは<span class='em'>約74%で+10G・約25%で+100G・約1%でMAX(天井到達扱い)</span>。実Gより液晶Gが進むため天井が早まる。狙い目判断は実Gではなく<span class='em'>液晶G数を基準</span>に。AT間天井(1200G)はメニューの実G数で確認。</p></div>" },
     { title:"狙い目・リセット", html:"<div class='ib'><p>等価で<span class='em'>450G〜</span>、5.6枚交換で<span class='em'>500G〜</span>。リセット濃厚台は<span class='em'>0Gから期待値プラス</span>（CZ天井200G短縮・朝一専用モード）。AT間1000G超え放置はAT間天井(直撃)も射程。</p></div>" },
     { title:"やめどき", html:"<div class='ib'><p><span class='em'>有馬貴将ジャッジメント失敗後は100G+αで必ずCZ当選</span>＝即ヤメ厳禁。AT終了後は<span class='em'>引き戻し・即前兆を5G以上</span>確認。アイキャッチで赤(赫眼)＝100G以内CZ濃厚。50Gで東京上空移行＝天国濃厚。</p></div>" },
     { title:"内部状態・ステージ", html:"<div class='ib'><p>通常/高確/超高確の3状態。<span class='em'>昼間＜夕暮れ＜夜更け</span>で高確以上に期待。超高確は<span class='em'>精神世界</span>に対応。AT中ステージは通常＜高確＜対決準備（対決濃厚）。</p></div>" },
