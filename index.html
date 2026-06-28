@@ -212,7 +212,7 @@ var MACHINE = {
   ],
 
   events: [
-    { key:"cz", name:"CZ", sub:"レミニセンス/利世", group:"通常時", icon:"🩸",
+    { key:"cz", name:"CZ", sub:"レミニセンス/利世", group:"通常時", icon:"🩸", countG:true,
       fields:[
         { type:"choice", key:"cztype", label:"CZ種別（利世は特大設定差・メニューで回数確認）",
           options:[
@@ -247,11 +247,11 @@ var MACHINE = {
       ],
       stat:{ countsAs:"cz", denomField:"cztype", failField:"res", failValue:"f" }
     },
-    { key:"ep", name:"エピソードBONUS", sub:"AT直行(特大設定差)", group:"通常時", icon:"📖",
+    { key:"ep", name:"エピソードBONUS", sub:"AT直行(特大設定差)", group:"通常時", icon:"📖", countG:true,
       fields:[ {type:"note"} ],
       stat:{ countsAs:"ep" }
     },
-    { key:"choku", name:"AT直撃", sub:"リプレイ直撃(EP除く)", group:"通常時", icon:"⚡",
+    { key:"choku", name:"AT直撃", sub:"リプレイ直撃(EP除く)", group:"通常時", icon:"⚡", countG:true,
       fields:[ {type:"note"} ],
       stat:{ countsAs:"choku" }
     },
@@ -706,7 +706,11 @@ function evDef(k){for(var i=0;i<M.events.length;i++)if(M.events[i].key===k)retur
 /* 総G数（AT/BN中Gを除外する区間最大値方式） */
 function totalG(){
   var total=0;
-  for(var i=0;i<LOG.length;i++){var g=parseInt(LOG[i].g,10);if(!isNaN(g)&&g>0)total+=g;}
+  for(var i=0;i<LOG.length;i++){
+    var def=evDef(LOG[i].ev);
+    if(!def||!def.countG)continue; // 区間を区切るイベントのみ算入
+    var g=parseInt(LOG[i].g,10);if(!isNaN(g)&&g>0)total+=g;
+  }
   return total;
 }
 
@@ -864,7 +868,8 @@ function rRec(){
 
   if(LOG.length){
     h+='<div class="card"><div class="ct">直近の記録 <span class="tag">×で削除</span></div>';
-    for(var i=LOG.length-1;i>=Math.max(0,LOG.length-4);i--)h+=tlItem(LOG[i],i,false);
+    var start=Math.max(0,LOG.length-4);
+    for(var i=start;i<LOG.length;i++)h+=tlItem(LOG[i],i,false);
     h+='</div>';
   }
   return h;
@@ -1035,6 +1040,7 @@ function rExp(){
     var e=LOG[i],def=evDef(e.ev),parts=[def?def.name:e.ev];
     if(typeof e.g==='number'&&e.g>0)parts.push(e.g+'G');
     if(def)(def.fields||[]).forEach(function(fld){
+      if(fld.type==='note'){if(e.note)parts.push(e.note);return;}
       var v=e[fld.key];if(v==null||v==='')return;
       if(fld.options){for(var o=0;o<fld.options.length;o++)if(fld.options[o].v===v){parts.push(fld.options[o].l);return;}}
       parts.push(v);
