@@ -200,8 +200,16 @@ var MACHINE = {
     g100:    { label:"100G以内CZ当選率", values:[19.6,21.0,23.2,26.4,32.0,36.0] },
     modori:  { label:"AT引き戻し率",     values:[7.81,7.81,9.38,10.94,12.50,15.23] },
     uraat:   { label:"初回裏AT選択率",   values:[1.10,1.32,1.63,2.19,2.85,3.32] },
-    seishin: { label:"精神世界 保証33G選択率", values:[3.1,3.1,6.3,9.4,10.9,12.5] }
+    seishin: { label:"精神世界 保証33G選択率", values:[3.1,3.1,6.3,9.4,10.9,12.5] },
+    weakch_normal: { label:"弱チェCZ当選率(通常滞在)", values:[0.27,0.29,0.31,0.33,0.38,0.43] },
+    weakch_high:   { label:"弱チェCZ当選率(高確滞在)", values:[0.59,0.63,0.69,0.73,0.83,0.95] }
   },
+
+  // レア役当選率の集計定義（rareイベントを解釈）
+  rareStats: [
+    { key:"weakch_normal", label:"弱チェ→CZ(通常滞在)", rare:"weakch", state:"tsujo",  pct:"weakch_normal" },
+    { key:"weakch_high",   label:"弱チェ→CZ(高確滞在)", rare:"weakch", state:"kakaku", pct:"weakch_high" }
+  ],
 
   events: [
     { key:"cz", name:"CZ", sub:"レミニセンス/利世", group:"通常時", icon:"🩸",
@@ -212,11 +220,20 @@ var MACHINE = {
             {v:"rize",   l:"大喰いの利世", denom:true},
             {v:"kakutei",l:"確定/直撃CZ", denom:false}
           ]},
+        { type:"choice", key:"kikkake", label:"突入契機",
+          options:[
+            {v:"gsu",   l:"規定G"},
+            {v:"rare",  l:"レア役"},
+            {v:"weakch",l:"弱チェリー"},
+            {v:"chokaku",l:"超高確から"},
+            {v:"seishin",l:"精神世界から"}
+          ]},
         { type:"choice", key:"trig", label:"当選G数（100G以内カウント）",
           options:[
             {v:"in100",  l:"100G以内", denom:true},
             {v:"over100",l:"101G以降", denom:true}
           ]},
+        { type:"number", key:"pt", label:"液晶pt（液晶G数・任意）" },
         { type:"result", key:"res", label:"成否",
           options:[{v:"s",l:"成功",cls:"win"},{v:"f",l:"失敗",cls:"lose"}] },
         { type:"screen", key:"czcard", label:"CZ終了画面カード（失敗時PUSH）", showIf:{res:"f"},
@@ -246,6 +263,14 @@ var MACHINE = {
             {v:"g20",l:"20G(保証23G)"},
             {v:"g30",l:"30G(保証33G)"}
           ]},
+        { type:"choice", key:"kikkake", label:"CZ当選契機",
+          options:[
+            {v:"weakch",l:"弱チェリー"},
+            {v:"suika", l:"スイカ"},
+            {v:"rare",  l:"強レア役"},
+            {v:"other", l:"その他"}
+          ]},
+        { type:"number", key:"pt", label:"液晶pt（液晶G数・任意）" },
         { type:"result", key:"res", label:"CZ当選した？",
           options:[{v:"s",l:"当選",cls:"win"},{v:"f",l:"非当選",cls:"lose"}] },
         { type:"note" }
@@ -263,6 +288,7 @@ var MACHINE = {
             {v:"white", l:"白(CZ以上濃厚)"},
             {v:"niji",  l:"虹(AT濃厚)"}
           ]},
+        { type:"number", key:"pt", label:"液晶pt（液晶G数・任意）" },
         { type:"choice", key:"g50", label:"50G移行？(天国濃厚)",
           options:[
             {v:"y",l:"50Gで移行"},
@@ -274,7 +300,16 @@ var MACHINE = {
       ]
     },
     { key:"kakugan", name:"赫眼リプレイ", sub:"下段リプレイ(通常/AT問わず・設定差小)", group:"その他", icon:"🔴",
-      fields:[ {type:"note"} ],
+      fields:[
+        { type:"choice", key:"keizoku", label:"継続G数",
+          options:[
+            {v:"g10",l:"10G"},
+            {v:"g20",l:"20G"},
+            {v:"g30",l:"30G"},
+            {v:"g50",l:"50G"}
+          ]},
+        { type:"note" }
+      ],
       stat:{ countsAs:"kakugan" }
     },
     { key:"freeze", name:"ロングフリーズ", sub:"確定チェリーの約1/6", group:"通常時", icon:"❄️",
@@ -295,7 +330,39 @@ var MACHINE = {
         { type:"note" }
       ]
     },
-    { key:"at", name:"AT初当り", sub:"東京喰種咬", group:"AT・上位", icon:"🎰",
+    { key:"rare", name:"レア役", sub:"弱チェCZ当選率の母数管理", group:"その他", icon:"🎯",
+      fields:[
+        { type:"choice", key:"yaku", label:"レア役の種類",
+          options:[
+            {v:"weakch",l:"弱チェリー"},
+            {v:"suika", l:"スイカ"},
+            {v:"chance",l:"チャンス目"},
+            {v:"strch", l:"強チェリー"},
+            {v:"kakuch",l:"確定チェリー"}
+          ]},
+        { type:"choice", key:"where", label:"状況",
+          options:[
+            {v:"normal",l:"通常時"},
+            {v:"at",    l:"AT中"}
+          ]},
+        { type:"choice", key:"state", label:"滞在状態(通常時のみ)", showIf:{where:"normal"},
+          options:[
+            {v:"tsujo", l:"通常"},
+            {v:"kakaku",l:"高確"},
+            {v:"chokaku",l:"超高確"}
+          ]},
+        { type:"result", key:"cz", label:"CZ当選した？(通常時)", showIf:{where:"normal"},
+          options:[{v:"s",l:"当選",cls:"win"},{v:"f",l:"非当選",cls:"lose"}] },
+        { type:"choice", key:"nose", label:"上乗せ(AT中のみ)", showIf:{where:"at"},
+          options:[
+            {v:"y",l:"上乗せあり"},
+            {v:"n",l:"なし"}
+          ]},
+        { type:"number", key:"mai", label:"上乗せ枚数(AT中・任意)", showIf:{where:"at"} },
+        { type:"note" }
+      ]
+    },
+    { key:"at", name:"AT初当り", sub:"東京喰種咬(開始時)", group:"AT・上位", icon:"🎰",
       fields:[
         { type:"choice", key:"keiyu", label:"突入契機",
           options:[
@@ -308,7 +375,18 @@ var MACHINE = {
             {v:"omote",l:"通常"},
             {v:"ura",  l:"裏AT"}
           ]},
-        { type:"number", key:"mai", label:"獲得枚数（任意）" },
+        { type:"note" }
+      ],
+      stat:{ countsAs:"at" }
+    },
+    { key:"atend", name:"AT終了", sub:"獲得枚数・終了画面・トロフィー", group:"AT・上位", icon:"🏁",
+      fields:[
+        { type:"number", key:"mai", label:"獲得枚数" },
+        { type:"choice", key:"kakenuke", label:"駆け抜け？(1戦目敗北=モードB以上示唆)",
+          options:[
+            {v:"normal",l:"通常終了"},
+            {v:"kake",  l:"駆け抜け"}
+          ]},
         { type:"screen", key:"endscr", label:"AT終了画面", showIf:{},
           options:[
             {v:"def",   l:"デフォルト"},
@@ -336,11 +414,16 @@ var MACHINE = {
             {v:"1000",l:"1000-7OVER",confirm:6}
           ]},
         { type:"note" }
-      ],
-      stat:{ countsAs:"at" }
+      ]
     },
     { key:"battle", name:"喰種対決", sub:"AT中バトルCZ", group:"AT・上位", icon:"👊",
       fields:[
+        { type:"choice", key:"kikkake", label:"突入契機",
+          options:[
+            {v:"gsu",  l:"規定G"},
+            {v:"rare", l:"レア役"},
+            {v:"hikei",l:"高確経由"}
+          ]},
         { type:"choice", key:"enemy", label:"対戦相手(期待度)",
           options:[
             {v:"shachi",l:"鯱40%"},
@@ -373,6 +456,12 @@ var MACHINE = {
           options:[
             {v:"mukade", l:"百足覚醒(約300枚)"},
             {v:"fukurou",l:"隻眼の梟(約500枚)"}
+          ]},
+        { type:"choice", key:"kikkake", label:"突入契機（任意）",
+          options:[
+            {v:"kuzu", l:"喰図柄揃い"},
+            {v:"rare", l:"レア役"},
+            {v:"other",l:"その他"}
           ]},
         { type:"number", key:"mai", label:"上乗せ枚数（任意）" },
         { type:"note" }
@@ -433,8 +522,19 @@ var MACHINE = {
     { key:"shoku", name:"喰ポイント解放", sub:"穢れMAX→BITES", group:"その他", icon:"🩹",
       fields:[ {type:"note"} ]
     },
-    { key:"other", name:"その他", sub:"メモ", group:"その他", icon:"⚙️",
-      fields:[ {type:"note"} ] }
+    { key:"other", name:"その他", sub:"状態メモ", group:"その他", icon:"⚙️",
+      fields:[
+        { type:"choice", key:"state", label:"内容（任意・履歴に表示）",
+          options:[
+            {v:"kakaku",l:"高確"},
+            {v:"chokaku",l:"超高確"},
+            {v:"mumei",l:"無名高確"},
+            {v:"zenchou",l:"前兆"},
+            {v:"kakugan",l:"赫眼"},
+            {v:"etc",l:"その他"}
+          ]},
+        { type:"note" }
+      ] }
   ],
 
   counters: [
@@ -637,6 +737,22 @@ function stats(){
     if(st.failField&&e[st.failField]===st.failValue)b.fail++;
   }
   out.bucket=bucket;
+  // レア役当選率の集計（rareStats宣言を解釈）
+  if(M.rareStats){
+    var rare={};
+    M.rareStats.forEach(function(rs){rare[rs.key]={total:0,hit:0};});
+    for(var ri=0;ri<LOG.length;ri++){
+      var re=LOG[ri];
+      if(re.ev!=='rare')continue;
+      M.rareStats.forEach(function(rs){
+        if(re.yaku===rs.rare && re.where==='normal' && re.state===rs.state){
+          rare[rs.key].total++;
+          if(re.cz==='s')rare[rs.key].hit++;
+        }
+      });
+    }
+    out.rare=rare;
+  }
   return out;
 }
 
@@ -797,16 +913,17 @@ function rCnt(){
   if(!st.totG)h+='<div class="sub">記録タブでG数とイベントを記録すると確率が出ます。</div>';
   h+='</div>';
 
-  // %系の推定（pctsの各項目について _hit バケットがあれば）
+  // レア役当選率の設定推定（rareStats：母数=成立回数, 分子=CZ当選回数）
   var pctHtml='';
-  for(var pk in M.pcts){
-    var p=M.pcts[pk],b2=st.bucket[pk+'_hit'];
-    if(b2&&b2.hit){
-      // 分母は同名rate or 別途。ここでは hit のみ表示
-      pctHtml+=estBar(p.label,b2.hit,b2.hit,p.values);
-    }
+  if(st.rare){
+    M.rareStats.forEach(function(rs){
+      var r=st.rare[rs.key];
+      if(r&&r.total>0){
+        pctHtml+=estBar(rs.label,r.hit,r.total,M.pcts[rs.pct].values);
+      }
+    });
   }
-  if(pctHtml)h+='<div class="card glow"><div class="ct">🎯 当選率の設定推定</div>'+pctHtml+'</div>';
+  if(pctHtml)h+='<div class="card glow"><div class="ct">🎯 弱チェCZ当選率の設定推定 <span class="tag">通常/高確別</span></div>'+pctHtml+'<div class="calc-sub">※超高確の弱チェは除外。母数=成立回数、分子=CZ当選。サンプルが少ないうちは参考程度に。</div></div>';
 
   // 手動カウンター
   h+='<div class="sub" style="margin:10px 0 6px">▼ 手動で計上する設定示唆（出たら+1）</div>';
@@ -826,7 +943,7 @@ function estBar(name,hit,total,pcts){
   var h='<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:rgba(255,255,255,.7);font-weight:700">'+esc(name)+'</span><span style="color:#7fe9dc;font-family:monospace">'+(total?(hit+'/'+total+' = '+(hit/total*100).toFixed(1)+'%'):'—')+'</span></div>';
   for(var s=0;s<6;s++){
     var pct=pcts[s],w=clamp(pct/(pcts[5]*1.15)*100,3,100),best=g&&g.best===s+1;
-    h+='<div class="sbar'+(best?' best':'')+'"><span class="sl">設'+(s+1)+'</span><span class="st"><span class="sf" style="width:'+w+'%"></span></span><span class="sv">'+pct.toFixed(1)+'%</span></div>';
+    h+='<div class="sbar'+(best?' best':'')+'"><span class="sl">設'+(s+1)+'</span><span class="st"><span class="sf" style="width:'+w+'%"></span></span><span class="sv">'+(pct<1?pct.toFixed(2):pct.toFixed(1))+'%</span></div>';
   }
   h+='</div>';return h;
 }
@@ -886,7 +1003,7 @@ function rInfo(){
       var p=M.pcts[pk];
       h+='<div style="font-size:11.5px;font-weight:700;color:#9fe9dd;margin:6px 0 4px">'+esc(p.label)+'</div><table class="itbl"><tr>';
       for(var s2=0;s2<6;s2++)h+='<th>設'+(s2+1)+'</th>';h+='</tr><tr>';
-      for(var s3=0;s3<6;s3++)h+='<td class="'+(s3>=3?'h':'')+'">'+p.values[s3].toFixed(1)+'%</td>';
+      for(var s3=0;s3<6;s3++)h+='<td class="'+(s3>=3?'h':'')+'">'+(p.values[s3]<1?p.values[s3].toFixed(2):p.values[s3].toFixed(1))+'%</td>';
       h+='</tr></table>';
     }
     h+='</div>';
@@ -913,7 +1030,7 @@ function rExp(){
     lines.push(M.rates[key].label+': '+(b.hit||0)+'回'+(b.hit&&st.totG?(' (1/'+Math.round(st.totG/b.hit)+')'):''));
   }
   if(cf.reasons.length){lines.push('');lines.push('【設定示唆】');cf.reasons.forEach(function(r){lines.push('・'+r);});}
-  lines.push('');lines.push('--- 履歴('+LOG.length+'件) ---');
+  lines.push('');lines.push('--- 履歴('+LOG.length+'件・古い順) ---');
   for(var i=0;i<LOG.length;i++){
     var e=LOG[i],def=evDef(e.ev),parts=[def?def.name:e.ev];
     if(typeof e.g==='number'&&e.g>0)parts.push(e.g+'G');
