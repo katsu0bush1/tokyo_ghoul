@@ -20,6 +20,24 @@
   --c-primary:#00E5C8; --c-accent:#FF3D7F; --c-bg:#04070d;
   --c-text:#dbe6ee; --c-win:#5bffa0; --c-lose:#ff5a78;
 }
+/* ---- 設定推測バー（2026-10-19 新設） ---- */
+.est{padding:8px 14px 10px}
+.est-top{display:flex;align-items:baseline;gap:8px;margin-bottom:7px}
+.est-lb{font-size:10px;color:rgba(255,255,255,.35);font-weight:600}
+.est-main{font-size:20px;font-weight:900}
+.est-conf{font-size:11px;color:rgba(255,255,255,.4);margin-left:auto}
+.bars{display:flex;flex-direction:column;gap:3px}
+.bar-row{display:flex;align-items:center;gap:7px}
+.bar-s{width:26px;font-size:12px;font-weight:800;text-align:center;border-radius:5px;padding:1px 0}
+.bar-track{flex:1;height:14px;background:rgba(255,255,255,.06);border-radius:7px;overflow:hidden}
+.bar-fill{height:100%;border-radius:7px;transition:width .35s cubic-bezier(.4,0,.2,1)}
+.bar-pct{width:40px;text-align:right;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.oe{display:flex;gap:6px;margin-top:7px}
+.oe-c{flex:1;padding:5px 8px;border-radius:9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);text-align:center;font-size:10px;color:rgba(255,255,255,.45)}
+.oe-c b{display:block;font-size:14px;font-weight:800;margin-top:1px;color:#fff}
+.est-note{font-size:9px;color:rgba(255,255,255,.34);margin-top:6px;line-height:1.5}
+.est-note b{color:rgba(255,255,255,.55)}
+
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overscroll-behavior:none}
 body{background:var(--c-bg);color:var(--c-text);font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN',sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
@@ -161,6 +179,8 @@ textarea{font-size:13px;font-family:inherit;font-weight:400;resize:none}
 </div>
 <div id="confirmMsg"></div>
 </div>
+<!-- 設定推測バー（2026-10-19 新設） -->
+<div class="est" id="est"></div>
 <div class="qs" id="qs"></div>
 <div id="bd"></div>
 <div id="tb"></div>
@@ -181,6 +201,32 @@ textarea{font-size:13px;font-family:inherit;font-weight:400;resize:none}
      下記はサンプル（攻殻機動隊を簡略化したデモデータ）。
      ==================================================================== -->
 <script id="machine">
+/* ★ エンディング中のカード（正本・2026-10-19 ユーザー提供）
+   ge   … 設定N以上濃厚（ハード制約）
+   deny … 設定N否定（その設定だけ消す）
+   sig  … 重みで効かせる示唆（odd/even/high の弱・強） */
+var ED_CARDS=[
+  {k:"odd_w",  l:"奇数設定示唆(弱)", sig:"odd_w"},
+  {k:"odd_s",  l:"奇数設定示唆(強)", sig:"odd_s"},
+  {k:"even_w", l:"偶数設定示唆(弱)", sig:"even_w"},
+  {k:"even_s", l:"偶数設定示唆(強)", sig:"even_s"},
+  {k:"high_w", l:"高設定示唆(弱)",   sig:"high_w"},
+  {k:"high_s", l:"高設定示唆(強)",   sig:"high_s"},
+  {k:"deny2",  l:"設定2否定", deny:2},
+  {k:"deny3",  l:"設定3否定", deny:3},
+  {k:"deny4",  l:"設定4否定", deny:4},
+  {k:"ge2",    l:"設定2以上濃厚", ge:2},
+  {k:"ge3",    l:"設定3以上濃厚", ge:3},
+  {k:"ge4",    l:"設定4以上濃厚", ge:4},
+  {k:"ge5",    l:"設定5以上濃厚", ge:5},
+  {k:"ge6",    l:"設定6濃厚",     ge:6}
+];
+/* 示唆の重み。⚠️ 出現率の解析が無いので**大きさは仮置き**（向きだけが根拠）。 */
+var ED_W={
+  odd_w :[1.35,.80,1.35,.80,1.35,.80], odd_s :[1.70,.55,1.70,.55,1.70,.55],
+  even_w:[.80,1.35,.80,1.35,.80,1.35], even_s:[.55,1.70,.55,1.70,.55,1.70],
+  high_w:[.80,.90,1.00,1.15,1.25,1.35], high_s:[.50,.65,.85,1.30,1.60,1.90]
+};
 var MACHINE = {
   id: "tokyoghoul",
   title: "東京喰種 SETTING NAVI",
@@ -312,11 +358,19 @@ var MACHINE = {
       ],
       stat:{ countsAs:"kakugan" }
     },
-    { key:"freeze", name:"ロングフリーズ", sub:"確定チェリーの約1/6", group:"通常時", icon:"❄️",
-      fields:[ {type:"number",key:"mai",label:"初期枚数(約2000枚)"}, {type:"note"} ]
-    },
-    { key:"kakuche", name:"確定チェリー", sub:"中段チェリー", group:"通常時", icon:"🍒",
-      fields:[ {type:"note"} ]
+    /* ⚠️ 2026-10-19 統合（ユーザー指示）: 「確定チェリー」と「ロングフリーズ」は別イベントではない。
+       ロングフリーズは**中段チェリー成立時の約1/6**で発生するので、同じ1つの中段チェリーを
+       2か所に記録すると二重計上になる。→ 中段チェリー1本にして、フリーズの有無を種別で持つ。 */
+    { key:"nakache", name:"中段チェリー", sub:"確定チェリー／約1/6でロングフリーズ", group:"通常時", icon:"🍒",
+      fields:[
+        { type:"choice", key:"kind", label:"種別",
+          options:[
+            {v:"normal", l:"中段チェリーのみ"},
+            {v:"freeze", l:"ロングフリーズ発生（約1/6）"}
+          ]},
+        { type:"number", key:"mai", label:"初期枚数（フリーズ時・約2000枚）" },
+        { type:"note" }
+      ]
     },
     { key:"suika", name:"スイカ(液晶G数加算)", sub:"擬似G加算→天井管理", group:"通常時", icon:"🍉",
       fields:[
@@ -338,7 +392,7 @@ var MACHINE = {
             {v:"suika", l:"スイカ"},
             {v:"chance",l:"チャンス目"},
             {v:"strch", l:"強チェリー"},
-            {v:"kakuch",l:"確定チェリー"}
+            {v:"kakuch",l:"中段チェリー"}
           ]},
         { type:"choice", key:"where", label:"状況",
           options:[
@@ -481,14 +535,13 @@ var MACHINE = {
     },
     { key:"ending", name:"エンディング到達", sub:"カード設定示唆", group:"AT・上位", icon:"🏆",
       fields:[
-        { type:"screen", key:"edcard", label:"エンディングカード", showIf:{},
-          options:[
-            {v:"normal",l:"青/赤など"},
-            {v:"kaneki",l:"金木研(銀)",confirm:3},
-            {v:"rize",  l:"神代利世(金)",confirm:4},
-            {v:"fukurou",l:"隻眼の梟(金)",confirm:5},
-            {v:"arima", l:"有馬貴将(虹)",confirm:6}
-          ]},
+        /* ⚠️ 2026-10-19 是正（ユーザー提供の正しい一覧）: エンディング中のカードは
+           キャラ名ではなく**示唆の種別14種**で記録する。濃厚系はハード制約、
+           否定系はその設定を消し、弱/強の示唆は重みとして効かせる。 */
+        { type:"screen", key:"edcard", label:"エンディング中のカード", showIf:{},
+          options:ED_CARDS.map(function(c){
+            return {v:c.k, l:c.l, confirm:(c.ge||null), deny:(c.deny||null), sig:(c.sig||null)};
+          })},
         { type:"note" }
       ]
     },
@@ -548,11 +601,21 @@ var MACHINE = {
     { key:"cz_juzo", name:"CZ後 鈴屋什造",    confirm:2, badge:"偶数濃厚" },
     { key:"cz_fukurou", name:"CZ後 梟カード",  confirm:4, badge:"設4以上濃厚" },
     { key:"cz_arima",   name:"CZ後 有馬貴将",  confirm:6, badge:"設6濃厚" },
-    { group:"エンディングカード（出たら+1）" },
-    { key:"ed_kaneki", name:"金木研(銀)",     confirm:3, badge:"設3以上濃厚" },
-    { key:"ed_rize",   name:"神代利世(金)",   confirm:4, badge:"設4以上濃厚" },
-    { key:"ed_fukurou",name:"隻眼の梟(金)",   confirm:5, badge:"設5以上濃厚" },
-    { key:"ed_arima",  name:"有馬貴将(虹)",   confirm:6, badge:"設6濃厚" },
+    { group:"エンディング中のカード（出たら+1）" },
+    { key:"ed_odd_w",  name:"奇数設定示唆(弱)", sig:"odd_w",  badge:"奇数" },
+    { key:"ed_odd_s",  name:"奇数設定示唆(強)", sig:"odd_s",  badge:"奇数(強)" },
+    { key:"ed_even_w", name:"偶数設定示唆(弱)", sig:"even_w", badge:"偶数" },
+    { key:"ed_even_s", name:"偶数設定示唆(強)", sig:"even_s", badge:"偶数(強)" },
+    { key:"ed_high_w", name:"高設定示唆(弱)",   sig:"high_w", badge:"高設定" },
+    { key:"ed_high_s", name:"高設定示唆(強)",   sig:"high_s", badge:"高設定(強)" },
+    { key:"ed_deny2",  name:"設定2否定", deny:2, badge:"設2否定" },
+    { key:"ed_deny3",  name:"設定3否定", deny:3, badge:"設3否定" },
+    { key:"ed_deny4",  name:"設定4否定", deny:4, badge:"設4否定" },
+    { key:"ed_ge2",    name:"設定2以上濃厚", confirm:2, badge:"設2以上濃厚" },
+    { key:"ed_ge3",    name:"設定3以上濃厚", confirm:3, badge:"設3以上濃厚" },
+    { key:"ed_ge4",    name:"設定4以上濃厚", confirm:4, badge:"設4以上濃厚" },
+    { key:"ed_ge5",    name:"設定5以上濃厚", confirm:5, badge:"設5以上濃厚" },
+    { key:"ed_ge6",    name:"設定6濃厚",     confirm:6, badge:"設6濃厚" },
     { group:"招待状・獲得枚数（出たら+1）" },
     { key:"in_zonbun", name:"招待状 存分に楽しもう", confirm:4, badge:"設4以上濃厚" },
     { key:"in_toku",   name:"招待状 特別な夜",  confirm:6, badge:"設6濃厚" },
@@ -760,6 +823,106 @@ function stats(){
   return out;
 }
 
+/* ============================================================================
+   設定推測（ベイズ：対数尤度 → softmax）  2026-10-19 新設
+   ----------------------------------------------------------------------------
+   ★使うのは**全6設定の数値が判明している表だけ**（M.rates / M.pcts）。
+     設定1しか分かっていない値や、等差で埋めた推定値は**使わない**
+     （1つの設定の値だけでは「どの設定か」の尤度が作れない）。
+   ★「数えていない項目」を0回として入れない。0回は『引けなかった』と
+     『数えていない』を区別できず、入れると推定が低設定へ系統的に偏る。
+     → hit>0 の項目だけ使う。
+   ★濃厚＝ハード制約 / 否定＝その設定だけ除外 / 弱強の示唆＝重み（仮置き）。
+   ============================================================================ */
+function estimate(){
+  var ll=[0,0,0,0,0,0], mask=[1,1,1,1,1,1], reasons=[], conf=[], used=0, warn=[];
+  var st=stats(), tG=st.totG||0;
+  function bino(hit,den,ps,label){
+    if(!den||hit>den){ if(hit>den)warn.push(label+' '+hit+'回 > 母数 '+den); return; }
+    used++;
+    for(var i=0;i<6;i++){
+      var p=Math.min(.999,Math.max(.00002,ps[i]));
+      ll[i]+=hit*Math.log(p)+(den-hit)*Math.log(1-p);
+    }
+    reasons.push(label+' '+hit+'/'+den);
+  }
+  // ① 出現率（分母＝総G）。hit>0 のときだけ
+  for(var key in M.rates){
+    var r=M.rates[key], b=(st.bucket&&st.bucket[key])||{hit:0};
+    if(!b.hit||tG<500)continue;
+    bino(b.hit,tG,r.denom.map(function(d){return 1/d;}),r.label+'(1/'+Math.round(tG/b.hit)+')');
+  }
+  // ② レア役→CZ当選率（M.rareStats）。母数があるときだけ
+  if(st.rare&&M.rareStats)M.rareStats.forEach(function(rs){
+    var d=st.rare[rs.key]; if(!d||!d.total)return;
+    var pc=M.pcts[rs.pct]; if(!pc)return;
+    bino(d.hit,d.total,pc.values.map(function(v){return v/100;}),pc.label);
+  });
+  // ③ 濃厚・否定・示唆（カウンター＋記録した画面）
+  function hard(minv,why){ for(var i=0;i<6;i++)if(i+1<minv)mask[i]=0; conf.push(why); used++; }
+  function deny(sv,why){ mask[sv-1]=0; conf.push(why); used++; }
+  function soft(w,n){ used++; for(var i=0;i<6;i++)ll[i]+=n*Math.log(ED_W[w][i]); }
+  (M.counters||[]).forEach(function(c){
+    if(!c.key)return; var n=cc(c.key); if(!n)return;
+    if(c.confirm)hard(c.confirm,c.name);
+    else if(c.deny)deny(c.deny,c.name);
+    else if(c.sig&&ED_W[c.sig])soft(c.sig,n);
+  });
+  for(var i2=0;i2<LOG.length;i2++){
+    var e=LOG[i2], def=evDef(e.ev); if(!def)continue;
+    (def.fields||[]).forEach(function(fld){
+      if(fld.type!=='screen'||!e[fld.key])return;
+      (fld.options||[]).forEach(function(o){
+        if(o.v!==e[fld.key])return;
+        if(o.confirm)hard(o.confirm,def.name+'「'+o.l+'」');
+        else if(o.deny)deny(o.deny,def.name+'「'+o.l+'」');
+        else if(o.sig&&ED_W[o.sig])soft(o.sig,1);
+      });
+    });
+  }
+  // ④ 矛盾したら制約を解除（全滅させない）
+  var any=0; for(var i3=0;i3<6;i3++)any+=mask[i3];
+  if(!any){ mask=[1,1,1,1,1,1]; warn.push('確定・否定が矛盾しています（入力ミスの可能性）。制約を解除しました'); }
+  var mx=-Infinity; for(var i4=0;i4<6;i4++)if(mask[i4]&&ll[i4]>mx)mx=ll[i4];
+  var ex=[],z=0;
+  for(var i5=0;i5<6;i5++){ var v=mask[i5]?Math.exp(ll[i5]-mx):0; ex.push(v); z+=v; }
+  var post=ex.map(function(v){return z?v/z:0;});
+  var best=0,bp=-1,hi=0,odd=0,even=0,esum=0;
+  for(var i6=0;i6<6;i6++){ if(post[i6]>bp){bp=post[i6];best=i6+1;}
+    esum+=(i6+1)*post[i6]; if(i6>=3)hi+=post[i6]; if((i6+1)%2)odd+=post[i6]; else even+=post[i6]; }
+  return {post:post,best:best,bestP:bp,exp:esum,hi:hi,odd:odd,even:even,
+          used:used,reasons:reasons,conf:conf,warn:warn};
+}
+
+/* 推測バー（画面上部） */
+function rEst(){
+  var E=estimate(), el=$('#est'); if(!el)return;
+  var SC=['#78909C','#42A5F5','#66BB6A','#FFA726','#EF5350','#AB47BC'], h='';
+  h+='<div class="est-top"><span class="est-lb">推定</span>';
+  if(E.used)h+='<span class="est-main" style="color:'+SC[E.best-1]+'">設定'+E.best+'</span>'
+    +'<span class="est-conf">確度 '+(E.bestP*100).toFixed(0)+'% / 期待値 '+E.exp.toFixed(2)+'</span>';
+  else h+='<span class="est-main" style="color:rgba(255,255,255,.3)">データ待ち</span>';
+  h+='</div><div class="bars">';
+  for(var i=0;i<6;i++){ var p=E.post[i]*100;
+    h+='<div class="bar-row"><div class="bar-s" style="color:'+SC[i]+';background:'+SC[i]+'22">'+(i+1)+'</div>'
+     +'<div class="bar-track"><div class="bar-fill" style="width:'+p.toFixed(1)+'%;background:'+SC[i]+'"></div></div>'
+     +'<div class="bar-pct" style="color:'+(E.used&&p>=E.bestP*100?SC[i]:'rgba(255,255,255,.5)')+'">'+p.toFixed(0)+'%</div></div>';
+  }
+  h+='</div>';
+  if(E.used){
+    h+='<div class="oe"><div class="oe-c">設4以上<b>'+(E.hi*100).toFixed(0)+'%</b></div>'
+      +'<div class="oe-c">奇数<b>'+(E.odd*100).toFixed(0)+'%</b></div>'
+      +'<div class="oe-c">偶数<b>'+(E.even*100).toFixed(0)+'%</b></div></div>';
+    if(E.conf.length)h+='<div class="est-note">確定要素: <b>'+esc(E.conf.join(' / '))+'</b></div>';
+    if(E.reasons.length)h+='<div class="est-note">根拠: '+esc(E.reasons.join(' / '))+'</div>';
+  }else{
+    h+='<div class="est-note">総G数と当選回数を記録すると推定が始まります。'
+      +'<b>全6設定の数値が判明している項目だけ</b>を使います。</div>';
+  }
+  if(E.warn.length)h+='<div class="est-note" style="color:#ffcc80">⚠ '+esc(E.warn.join(' / '))+'</div>';
+  el.innerHTML=h;
+}
+
 /* 確定判定：counters[].confirm ＋ screenフィールドのconfirm */
 function confirmedMin(){
   var min=1, reasons=[];
@@ -801,7 +964,7 @@ function applyTheme(){
 }
 
 function render(){
-  rHdr(); rQS();
+  rHdr(); rEst(); rQS();
   var bd=$('#bd');
   if(curTab==='rec')bd.innerHTML=rRec();
   else if(curTab==='cnt')bd.innerHTML=rCnt();
